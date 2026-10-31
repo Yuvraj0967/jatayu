@@ -15,3 +15,5 @@ firmware/managed_components/
 firmware/dependencies.lock
 .playwright-mcp/
 projection-*.png
+backend/jatayu.db*
+backend/jatayu.simulated.db*

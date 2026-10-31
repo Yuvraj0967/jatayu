@@ -34,6 +34,10 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from processing import CSIProcessor, ProcessorConfig
 from serial_io import SerialCSIReader, SimulatedCSIProducer, list_serial_ports
+from jatayu.api import LiveHub, build_routes
+from jatayu.arduino_io import ArduinoReader, SimulatedArduino
+from jatayu.service import JatayuService
+from jatayu.store import Store
 
 BACKEND_DIR = Path(__file__).resolve().parent
 DASHBOARD = BACKEND_DIR.parent / "dashboard" / "index.html"
@@ -58,6 +62,9 @@ class RuntimeOptions:
     simulate_motion: bool = False
     auto_alert: bool = False
     model_path: str | None = None
+    arduino_port: str = "auto"  # "auto", a device path, or "none" to disable
+    arduino_baud: int = 115200
+    db_path: str = str(BACKEND_DIR / "jatayu.db")
 
 
 @dataclass
@@ -91,6 +98,10 @@ class RescueRuntime:
         self.events: deque[Event] = deque(maxlen=40)
         self._last_state: str | None = None
         self._last_calibration_result: Any = None
+        self.store = Store(options.db_path)
+        self.hub = LiveHub()
+        self.jatayu = JatayuService(self.store, simulated=options.simulate)
+        self.jatayu.publish = self.hub.publish
 
     # -- lifecycle ---------------------------------------------------------
     async def start(self) -> None:
@@ -111,7 +122,23 @@ class RescueRuntime:
             self.reader = SerialCSIReader(self.options.serial_port, self.options.baud, on_frame=self.processor.add_frame)
             self.reader.start()
             self.log("source", f"Listening for the ESP32 on {self.options.serial_port} @ {self.options.baud} baud.")
+        self._start_arduino()
+        self.hub.loop = asyncio.get_running_loop()
         self.tasks.append(asyncio.create_task(self._broadcast_loop(), name="telemetry-broadcast"))
+
+    def _start_arduino(self) -> None:
+        if self.options.simulate:
+            device: Any = SimulatedArduino(self.jatayu.handle_arduino_message)
+        elif self.options.arduino_port.lower() == "none":
+            self.log("source", "Arduino link disabled (--arduino-port none).")
+            return
+        else:
+            device = ArduinoReader(
+                self.options.arduino_port, self.options.arduino_baud, self.jatayu.handle_arduino_message,
+                exclude_ports=lambda: {self.reader.active_port} if self.reader and self.reader.active_port else set(),
+            )
+        self.jatayu.attach_arduino(device)
+        device.start()
 
     async def stop(self) -> None:
         for client in tuple(self.clients):
@@ -121,10 +148,13 @@ class RescueRuntime:
         if self.reader is not None:
             self.reader.send_alert(False)
             self.reader.stop()
+        if self.jatayu.arduino is not None:
+            self.jatayu.arduino.stop()
         for task in self.tasks:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        self.store.close()
 
     def _load_optional_model(self) -> None:
         if not self.options.model_path:
@@ -158,6 +188,9 @@ class RescueRuntime:
             if self.options.auto_alert and telemetry["presence"] != self.alert_active:
                 await self.set_alert(bool(telemetry["presence"]), origin="auto")
             telemetry.update(self._envelope())
+            snapshot = self.jatayu.tick(telemetry)
+            await self.hub.broadcast(snapshot)
+            telemetry["jatayu"] = snapshot
             self.latest = telemetry
             await self.broadcast(telemetry)
             await asyncio.sleep(max(0.05, 1.0 - (time.monotonic() - started)))
@@ -388,6 +421,7 @@ def create_app(options: RuntimeOptions) -> Starlette:
         Route("/calibration/stop", calibration_stop, methods=["POST"]),
         Route("/calibration/clear", calibration_clear, methods=["POST"]),
         Route("/simulate", simulate, methods=["POST"]),
+        *build_routes(runtime.jatayu, runtime.hub, lambda: runtime.reader.status() if runtime.reader else {"kind": "simulation"}),
         WebSocketRoute("/ws", websocket_endpoint),
     ]
     # CORS: the dashboard may also be opened straight from disk (file://).
@@ -450,6 +484,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--simulate-absent", action="store_true", help="start the simulation with nobody present")
     parser.add_argument("--simulate-motion", action="store_true", help="add occasional random movement to the simulation")
     parser.add_argument("--auto-alert", action="store_true", help="drive the buzzer automatically from detections")
+    parser.add_argument("--arduino-port", default="auto", help="Arduino Mega port, 'auto', or 'none' (default: auto)")
+    parser.add_argument("--arduino-baud", type=int, default=115200, help="Arduino baud rate (default: 115200)")
+    parser.add_argument("--db", default=str(BACKEND_DIR / "jatayu.db"), help="SQLite database path")
     parser.add_argument("--model", help="optional joblib model from train_presence_model.py")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (0.0.0.0 to allow other devices)")
     parser.add_argument("--port", type=int, default=8000, help="HTTP port")
@@ -483,6 +520,9 @@ def main() -> None:
         simulate_motion=args.simulate_motion,
         auto_alert=args.auto_alert,
         model_path=args.model,
+        arduino_port=args.arduino_port,
+        arduino_baud=args.arduino_baud,
+        db_path=str(BACKEND_DIR / "jatayu.simulated.db") if args.simulate and args.db == str(BACKEND_DIR / "jatayu.db") else args.db,
     )
     url = f"http://{'127.0.0.1' if args.host in {'0.0.0.0', '::'} else args.host}:{args.port}"
     mode = "SIMULATION" if args.simulate else f"ESP32 serial ({args.serial_port})"

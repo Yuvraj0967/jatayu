@@ -99,3 +99,38 @@ it blends with, and never bypasses, the empty-room safety thresholds.
 python tests\test_pipeline.py          # fast regression suite (no pytest needed)
 python tests\evaluate_pipeline.py      # accuracy sweep against the simulator
 ```
+
+## JATAYU layer (`jatayu/`)
+
+Adds the Arduino Mega link, SQLite storage, rule-based fusion, incidents and an
+auditable command lifecycle on top of the CSI pipeline. Raw CSI is never stored.
+
+```bash
+python app.py --simulate                         # ESP32 + Arduino both simulated, labelled "simulated"
+python app.py --serial-port /dev/ttyACM0 --arduino-port /dev/ttyACM1
+python app.py --arduino-port none                # CSI only
+python -m pytest tests
+```
+
+**Arduino protocol** (115200 baud, one JSON object per line). Mega -> Pi:
+`hello`, `sensor_reading {sensor, raw_adc 0-1023, model?, calibration?}`,
+`key_event {key}`, `cmd_ack {command_id, status: received|executed|failed}`.
+Pi -> Mega: `display {line1, line2}` (16x2, ASCII), and `command {command_id, name, args}`
+where `name` is one of `LCD_SHOW, BUZZER, REBOOT_PERIPHERALS, PING`. Malformed lines
+are counted and dropped. The Pi owns the key-to-action map.
+
+**API:** `GET /api/status`, `/api/sensors/latest`, `/api/sensors/history`, `/api/rf/status`,
+`/api/rf/history`, `/api/incidents[/{id}]`, `/api/events`, `/api/commands`;
+`POST /api/monitoring/start|stop`, `/api/inspection/request`,
+`/api/incidents/{id}/acknowledge|close` (close requires prior acknowledgement),
+`/api/sensors/rebaseline`; simulation only: `POST /api/simulate/key`, `/api/simulate/gas`.
+Live updates on `ws://host:8000/ws/live` (state snapshot each second plus every event).
+
+**Semantics.** RF states: DISCONNECTED, COLLECTING, INSUFFICIENT_DATA, LOW_SIGNAL_QUALITY,
+NO_CLEAR_PERIODIC_PATTERN, PERIODIC_PATTERN_OBSERVED, REVIEW_RECOMMENDED (pattern held
+>= 20 s), reported with a separate data-quality grade and qualitative confidence. Gas
+is raw ADC counts against a self-measured baseline after warm-up (never ppm). Incidents
+are created only while monitoring is on, group observations within 120 s, and commands
+move created -> sent -> received -> executed -> acknowledged (or failed / timed_out).
+SQLite file: `jatayu.db` (`jatayu.simulated.db` with `--simulate`); sensor and RF rows
+older than 7 days are pruned hourly.
