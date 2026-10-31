@@ -9,7 +9,7 @@ Update this file whenever the physical setup changes. Verify before buying anyth
 | ESP32-S3 dev board | Two USB sockets: CH343 UART bridge (`1a86:55d3`) and native USB (`303a:1001`). The current firmware prints on native USB, so connect that socket to the Pi. Record the exact module marking, flash/PSRAM and antenna type. |
 | Arduino UNO | Reads the MQ-135 and keypad; firmware in `arduino/jatayu_uno`. No LCD on this board. |
 | MQ-135 | VCC 5V, GND, AO to A0, DO unused. Raw ADC counts only, never ppm. Heater draws about 150 mA from the UNO's 5 V: watch `vcgencmd get_throttled` on the Pi. |
-| 4x4 keypad | Ribbon wires 1-8 to D2-D9, no power. Rows D2-D5 and columns D6-D9 are provisional until every key is checked. |
+| 4x4 keypad | Ribbon wires 1-8 to D2-D9, connected in reverse: D2-D5 reach columns right to left, D6-D9 rows bottom to top. The firmware table matches this, so keep the wiring order. Inferred from key-press history; confirm all 16 keys. |
 | 3 x 2 kOhm resistors | Not needed with USB serial. |
 | Power supply | Check the label for the Pi (5 V, 3 A class). |
 

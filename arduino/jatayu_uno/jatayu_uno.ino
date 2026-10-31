@@ -8,20 +8,19 @@
  * Wiring:  MQ-135 VCC -> 5V, GND -> GND, AO -> A0 (DO not connected).
  *          Keypad ribbon wires 1-8 -> D2-D9. No external power.
  *
- * Which wires are rows is not yet verified. The earlier test only connected a
- * wire from D2-D5 to one from D6-D9, which fits ROW_PINS/COL_PINS below. Every
- * key_event carries its row and column ("r", "c"), so a wrong entry in KEYS can
- * be spotted and corrected.
+ * This ribbon is connected in reverse order: D2-D5 reach the keypad's columns
+ * (right to left) and D6-D9 its rows (bottom to top). KEYS is laid out to match.
+ * Every key_event carries its scan row and column ("r", "c") for checking.
  */
 
 const uint8_t MQ_PIN = A0;
 const uint8_t ROW_PINS[4] = {2, 3, 4, 5};
 const uint8_t COL_PINS[4] = {6, 7, 8, 9};
 const char KEYS[4][4] = {
-  {'1', '2', '3', 'A'},
-  {'4', '5', '6', 'B'},
-  {'7', '8', '9', 'C'},
-  {'*', '0', '#', 'D'},
+  {'D', 'C', 'B', 'A'},
+  {'#', '9', '6', '3'},
+  {'0', '8', '5', '2'},
+  {'*', '7', '4', '1'},
 };
 
 const unsigned long SENSOR_INTERVAL_MS = 1000;
@@ -160,7 +159,7 @@ void setup() {
     pinMode(ROW_PINS[i], INPUT_PULLUP);
     pinMode(COL_PINS[i], INPUT_PULLUP);
   }
-  Serial.println(F("{\"type\":\"hello\",\"firmware\":\"jatayu-uno-1.0\",\"model\":\"MQ-135\",\"lcd\":false}"));
+  Serial.println(F("{\"type\":\"hello\",\"firmware\":\"jatayu-uno-1.1\",\"model\":\"MQ-135\",\"lcd\":false}"));
 }
 
 void loop() {
