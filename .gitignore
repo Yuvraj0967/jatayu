@@ -17,3 +17,9 @@ firmware/dependencies.lock
 projection-*.png
 backend/jatayu.db*
 backend/jatayu.simulated.db*
+console/node_modules/
+console/dist/
+console/shots/
+console/*.png
+.env
+*.env
