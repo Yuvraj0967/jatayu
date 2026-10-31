@@ -360,3 +360,17 @@ def test_console_and_csi_pages_are_served():
             assert banned.lower() not in home.text.lower()
         csi = client.get("/csi")
         assert csi.status_code == 200 and "RescueSense Console" not in csi.text
+
+
+def test_console_has_guidance_and_signal_lab():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        home = client.get("/").text
+        for needle in ("What to do next", "Setup checklist", "Signal lab", "/csi?embed=1", "Help and glossary", "Take the tour", "Simple", "Text size"):
+            assert needle in home, needle
+        lab = client.get("/csi?embed=1").text
+        assert "How to use this view" in lab and "Record empty room" in lab

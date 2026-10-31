@@ -136,6 +136,58 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   @media (prefers-reduced-motion: no-preference) { .chart svg, .meter > span { transition: opacity .2s; } }
   .dim { opacity: .55; }
+  .tabbar { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 16px; border-bottom: 1px solid var(--line); }
+  .tabbar button { all: unset; padding: 9px 16px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--text-2); }
+  .tabbar button:hover { color: var(--text); }
+  .tabbar button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+  .labframe { width: 100%; height: calc(100vh - 150px); min-height: 680px; border: 1px solid var(--line); border-radius: 12px; background: #0b0f14; }
+  body { font-size: var(--fs, 14px); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 14px; }
+  .toolbar .lab { color: var(--text-3); font-size: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { all: unset; padding: 5px 12px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line-2); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .welcome { display: none; margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: var(--accent-wash); color: var(--text); gap: 10px; align-items: center; flex-wrap: wrap; }
+  :root:where(:not([data-theme="dark"])) .welcome { color: #0b0b0b; }
+  .welcome.on { display: flex; }
+  .coach { display: flex; gap: 14px; align-items: flex-start; border-left: 6px solid var(--accent); }
+  .coach .ico { font-size: 26px; line-height: 1.1; flex: none; width: 30px; text-align: center; }
+  .coach h2 { font-size: 1.2em; margin: 0; }
+  .coach p { margin: 5px 0 0; color: var(--text-2); }
+  .coach ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); }
+  .coach.tone-warn { border-left-color: var(--warn); } .coach.tone-bad { border-left-color: var(--crit); } .coach.tone-ok { border-left-color: var(--good); }
+  .check { list-style: none; margin: 8px 0 0; padding: 0; }
+  .check li { display: grid; grid-template-columns: 24px 1fr; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .check li:last-child { border-bottom: 0; }
+  .check .hint { color: var(--text-3); font-size: .86em; }
+  .check .mk { font-weight: 700; text-align: center; }
+  .hl { display: inline-flex; gap: 8px; align-items: center; }
+  .help-btn { all: unset; box-sizing: border-box; width: 24px; height: 24px; border: 1px solid var(--line-2); border-radius: 50%; text-align: center; line-height: 22px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface); flex: none; }
+  .help-btn:hover { background: var(--surface-2); }
+  .help-btn[aria-expanded="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .help-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .help { background: var(--surface-2); border-radius: 8px; padding: 9px 12px; margin: 0 0 10px; font-size: .93em; color: var(--text-2); }
+  .help b { color: var(--text); }
+  .help ul { margin: 4px 0 0; padding-left: 18px; }
+  body.simple .detail-only { display: none !important; }
+  .spot { position: fixed; z-index: 60; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.55); pointer-events: none; transition: all .25s; }
+  .tour { position: fixed; z-index: 61; width: min(350px, calc(100vw - 24px)); background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .tour h3 { margin: 0 0 4px; font-size: 1.05em; }
+  .tour p { margin: 0 0 10px; color: var(--text-2); }
+  .tour .foot { display: flex; align-items: center; gap: 8px; }
+  .tour .foot .grow { flex: 1; color: var(--text-3); font-size: .86em; }
+  @media (prefers-reduced-motion: reduce) { .spot { transition: none; } }
+  .toast.ok { border-color: var(--accent); }
+  #dlgHelp { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); overflow: auto; }
+  #dlgHelp h2 { margin: 0 0 4px; } #dlgHelp h3 { margin: 18px 0 6px; font-size: 1.05em; }
+  #dlgHelp ol, #dlgHelp ul { margin: 6px 0; padding-left: 20px; }
+  #dlgHelp li { margin: 3px 0; }
+  .gl { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 6px 14px; margin: 6px 0; }
+  .gl dt { font-weight: 600; } .gl dd { margin: 0; color: var(--text-2); }
+  @media (max-width: 640px) { .gl { grid-template-columns: 1fr; } .gl dd { margin-bottom: 6px; } }
 </style>
 </head>
 <body>
@@ -158,38 +210,64 @@
   <p class="banner"><b>Read this first.</b> A periodic RF pattern is an observation for operator review, not proof of a person or of breathing. Gas readings are raw ADC counts from an uncalibrated MQ sensor, not a gas concentration and not evidence of a person. This is not a life-safety instrument.</p>
   <div class="stale-bar" id="staleBar" role="alert"></div>
 
+  <div class="welcome" id="welcome" role="region" aria-label="Welcome"><span><b>New here?</b> Take a one-minute tour of this page, or open the help guide any time.</span>
+    <button class="btn small primary" id="welTour" type="button">Start the tour</button><button class="btn small" id="welSkip" type="button">No thanks</button></div>
+
+  <div class="toolbar" role="toolbar" aria-label="Page comfort and help">
+    <span class="lab" id="viewLab">View</span>
+    <span class="seg" role="group" aria-labelledby="viewLab"><button type="button" id="vSimple" aria-pressed="false">Simple</button><button type="button" id="vDetail" aria-pressed="true">Detailed</button></span>
+    <span class="lab" id="fsLab">Text size</span>
+    <span class="seg" role="group" aria-labelledby="fsLab"><button type="button" id="fsDown" aria-label="Smaller text">A&minus;</button><button type="button" id="fsUp" aria-label="Larger text">A+</button></span>
+    <span class="spacer"></span>
+    <button class="btn small" id="tourBtn" type="button">Take the tour</button>
+    <button class="btn small" id="helpBtn" type="button">Help and glossary</button>
+  </div>
+
+  <div class="grid" style="margin-top:14px;align-items:start" aria-label="Guidance">
+    <section class="card c8 coach" id="coach" aria-live="polite" aria-label="What to do next"></section>
+    <section class="card c4" id="checklist" aria-label="Setup checklist"></section>
+  </div>
+
+  <div class="tabbar" role="tablist" aria-label="Page sections">
+    <button type="button" role="tab" id="tabOv" aria-selected="true" aria-controls="paneOverview">Overview</button>
+    <button type="button" role="tab" id="tabLab" aria-selected="false" aria-controls="paneLab">Signal lab: waveform, spectrum, 3D view, calibration</button>
+  </div>
+  <div id="paneOverview" role="tabpanel" aria-labelledby="tabOv">
   <section class="tiles" id="tiles" aria-label="System status"></section>
 
   <div class="grid">
     <!-- RF -->
-    <section class="card c6" aria-labelledby="rfH">
-      <div class="head"><h2 id="rfH">RF observation</h2><span id="rfChip"></span></div>
+    <section class="card c6" id="rfCard" aria-labelledby="rfH">
+      <div class="head"><h2 id="rfH">RF observation</h2><span class="hl"><span id="rfChip"></span><button class="help-btn" type="button" aria-expanded="false" aria-controls="hRf" aria-label="Explain this card">?</button></span></div>
+      <div class="help" id="hRf" hidden><b>What this is.</b> The ESP32 listens to how Wi-Fi signals change in the room. This card says whether those changes repeat in a regular pattern.<ul><li><b>State</b> is the plain-language result. <b>Data quality</b> says whether the signal is good enough to trust it.</li><li>A regular pattern can come from a person, a fan or anything that moves. It is a reason to look, never proof of a person.</li><li>If quality is Low or None, ignore the state and fix the signal first.</li></ul></div>
       <div id="rfText" class="sec"></div>
       <dl class="kv" id="rfKv"></dl>
-      <div class="chart" id="rfChart"></div>
+      <div class="detail-only"><div class="chart" id="rfChart"></div>
       <div class="head" style="margin:4px 0 0"><span class="note" style="margin:0" id="rfNote"></span><button class="btn small" id="rfTblBtn" type="button" aria-pressed="false">Table view</button></div>
-      <div id="rfTable" class="tablewrap" hidden></div>
+      <div id="rfTable" class="tablewrap" hidden></div></div>
     </section>
 
     <!-- Environment -->
-    <section class="card c6" aria-labelledby="envH">
-      <div class="head"><h2 id="envH">Environmental sensor (experimental)</h2><span id="envChip"></span></div>
+    <section class="card c6" id="envCard" aria-labelledby="envH">
+      <div class="head"><h2 id="envH">Environmental sensor (experimental)</h2><span class="hl"><span id="envChip"></span><button class="help-btn" type="button" aria-expanded="false" aria-controls="hEnv" aria-label="Explain this card">?</button></span></div>
+      <div class="help" id="hEnv" hidden><b>What this is.</b> A gas sensor on the Arduino. The number is a raw electrical reading (0 to 1023), not a gas amount.<ul><li>It needs about two minutes to warm up. After that the system learns what is normal here (the baseline).</li><li><b>Elevated</b> means the reading rose well above that baseline. It does not say which gas, and it does not mean a person is present.</li><li>Press <b>Re-baseline</b> if you moved the sensor to a new place.</li></ul></div>
       <div id="envText" class="sec"></div>
       <dl class="kv" id="envKv"></dl>
-      <div class="chart" id="envChart"></div>
+      <div class="detail-only"><div class="chart" id="envChart"></div>
       <div class="head" style="margin:4px 0 0"><span class="note" style="margin:0" id="envNote"></span><span><button class="btn small" id="rebaseBtn" type="button">Re-baseline</button> <button class="btn small" id="envTblBtn" type="button" aria-pressed="false">Table view</button></span></div>
-      <div id="envTable" class="tablewrap" hidden></div>
+      <div id="envTable" class="tablewrap" hidden></div></div>
     </section>
 
     <!-- Incidents -->
-    <section class="card c12" aria-labelledby="incH">
+    <section class="card c12" id="incCard" aria-labelledby="incH">
       <div class="head">
-        <h2 id="incH">Incidents</h2>
+        <h2 id="incH">Incidents <button class="help-btn" type="button" aria-expanded="false" aria-controls="hInc" aria-label="Explain this card">?</button></h2>
         <span class="actions" style="margin:0">
           <button class="btn small" id="newIncBtn" type="button">New incident</button>
           <button class="btn small" id="inspBtn" type="button">Request inspection</button>
         </span>
       </div>
+      <div class="help" id="hInc" hidden><b>What this is.</b> An incident is a folder for evidence that deserves a human look.<ul><li>It opens by itself when monitoring is on and something notable is seen, or you can open one with <b>New incident</b>.</li><li>Click an incident to read its evidence, add notes and <b>Acknowledge</b> it, which records that a person has looked.</li><li><b>Close incident</b> only works after it was acknowledged. New evidence reopens an acknowledged incident.</li><li><b>Request inspection</b> logs your request and shows a message on the Arduino screen.</li></ul></div>
       <div class="split">
         <div>
           <ul class="list" id="incList" aria-label="Incident list"></ul>
@@ -200,29 +278,33 @@
     </section>
 
     <!-- Timeline -->
-    <section class="card c6" aria-labelledby="evH">
-      <div class="head"><h2 id="evH">Event timeline</h2>
+    <section class="card c6" id="evCard" aria-labelledby="evH">
+      <div class="head"><h2 id="evH">Event timeline <button class="help-btn" type="button" aria-expanded="false" aria-controls="hEv" aria-label="Explain this card">?</button></h2>
         <label class="small muted"><input type="checkbox" id="evSel"> Selected incident only</label></div>
+      <div class="help" id="hEv" hidden><b>What this is.</b> A time-stamped record of everything that happened: devices connecting, states changing, buttons pressed and what you did. Newest first. Nothing here can be edited, so it is your audit trail.</div>
       <ul class="list tl" id="evList" aria-label="Events, newest first"></ul>
     </section>
 
     <!-- Commands -->
-    <section class="card c6" aria-labelledby="cmdH">
-      <div class="head"><h2 id="cmdH">Device commands</h2><span class="muted small">created, sent, received, executed, acknowledged</span></div>
+    <section class="card c6 detail-only" id="cmdCard" aria-labelledby="cmdH">
+      <div class="head"><h2 id="cmdH">Device commands <button class="help-btn" type="button" aria-expanded="false" aria-controls="hCmd" aria-label="Explain this card">?</button></h2><span class="muted small">created, sent, received, executed, acknowledged</span></div>
+      <div class="help" id="hCmd" hidden><b>What this is.</b> Messages this page sent to the Arduino. Each one moves through <b>created, sent, received, executed, acknowledged</b>. If it stops early it ends as <b>failed</b> or <b>timed out</b>, so you can see when a device never confirmed.</div>
       <div class="tablewrap" style="max-height:360px"><table><thead><tr><th>Time</th><th>Command</th><th>State</th><th>Detail</th></tr></thead><tbody id="cmdBody"></tbody></table></div>
       <p class="note" id="cmdEmpty" hidden>No commands yet. Requesting an inspection sends one to the Arduino's LCD.</p>
     </section>
 
     <!-- Nodes -->
-    <section class="card c8" aria-labelledby="nodeH">
-      <div class="head"><h2 id="nodeH">Sensor nodes</h2><span class="muted small">deployment metadata, groundwork for multi-node work</span></div>
+    <section class="card c8 detail-only" id="nodeCard" aria-labelledby="nodeH">
+      <div class="head"><h2 id="nodeH">Sensor nodes <button class="help-btn" type="button" aria-expanded="false" aria-controls="hNode" aria-label="Explain this card">?</button></h2><span class="muted small">deployment metadata, groundwork for multi-node work</span></div>
+      <div class="help" id="hNode" hidden><b>What this is.</b> The ESP32 receivers. Press <b>Edit</b> to record where each one is placed (metres from a point you choose) and which way it faces. Nothing uses this yet; it prepares for using several receivers later.</div>
       <div class="tablewrap" style="max-height:none"><table><thead><tr><th>Node</th><th>Role</th><th class="num">x (m)</th><th class="num">y (m)</th><th class="num">z (m)</th><th class="num">Heading (deg)</th><th>Antenna</th><th>Last seen</th><th></th></tr></thead><tbody id="nodeBody"></tbody></table></div>
       <p class="note" id="nodeEmpty" hidden>No node has reported yet.</p>
     </section>
 
     <!-- Physical -->
-    <section class="card c4" aria-labelledby="phyH">
-      <div class="head"><h2 id="phyH">Physical controls</h2></div>
+    <section class="card c4 detail-only" id="phyCard" aria-labelledby="phyH">
+      <div class="head"><h2 id="phyH">Physical controls</h2><button class="help-btn" type="button" aria-expanded="false" aria-controls="hPhy" aria-label="Explain this card">?</button></div>
+      <div class="help" id="hPhy" hidden><b>What this is.</b> The keypad and small screen on the Arduino. Keys: 1 start, 2 stop, 4 request inspection, 8 acknowledge. In simulation you can press them here.</div>
       <dl class="kv" id="phyKv"></dl>
       <div id="simBox" hidden>
         <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
@@ -233,6 +315,11 @@
           <input type="range" id="gasOff" min="-300" max="700" step="10" value="0"></div>
       </div>
     </section>
+  </div>
+  </div>
+  <div id="paneLab" role="tabpanel" aria-labelledby="tabLab" hidden>
+    <p class="note" style="margin:12px 0 8px">This is the original live signal view, unchanged: waveform, spectrum, 3D projection, calibration and simulation controls. Do the <b>empty-room calibration</b> here before real use. <a href="/csi" target="_blank" rel="noopener">Open it in its own tab</a>.</p>
+    <iframe id="labFrame" class="labframe" title="Signal lab, the original CSI view" loading="lazy"></iframe>
   </div>
 </main>
 
@@ -247,6 +334,11 @@
   <div class="field"><label for="inspNotes">Notes (optional, up to 500 characters)</label><textarea id="inspNotes" maxlength="500"></textarea></div>
   <div class="actions" style="justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Send request</button></div>
 </form></dialog>
+<dialog id="dlgHelp" aria-labelledby="hlpT"><div id="helpBody"></div>
+  <div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="hlpTour" type="button">Take the tour</button><button class="btn primary" id="hlpClose" type="button">Close</button></div></dialog>
+<div class="spot" id="spot" hidden></div>
+<div class="tour" id="tour" role="dialog" aria-modal="false" aria-labelledby="tourT" hidden><h3 id="tourT"></h3><p id="tourP"></p>
+  <div class="foot"><span class="grow" id="tourN"></span><button class="btn small" id="tourSkip" type="button">Skip</button><button class="btn small" id="tourBack" type="button">Back</button><button class="btn small primary" id="tourNext" type="button">Next</button></div></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -262,7 +354,7 @@ function h(tag, attrs, ...kids) {
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const kid of kids.flat()) {
+  for (const kid of kids.flat(Infinity)) {
     if (kid == null || kid === false) continue;
     el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   }
@@ -275,7 +367,7 @@ const ago = (s) => s == null ? '--' : s < 60 ? `${Math.round(s)} s ago` : s < 36
 const pretty = (s) => { s = String(s || '').replace(/_/g, ' ').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
 const num = (v, d = 1) => (v == null || Number.isNaN(Number(v))) ? '--' : Number(v).toFixed(d);
 const pct = (v) => v == null ? '--' : `${(Number(v) * 100).toFixed(1)}%`;
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 6000); }
+function toast(msg, ok) { const t = $('toast'); t.textContent = msg; t.className = 'toast on' + (ok ? ' ok' : ''); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), ok ? 4000 : 7000); }
 async function api(path, opts) {
   const r = await fetch(path, opts);
   let data = null; try { data = await r.json(); } catch (_) {}
@@ -404,6 +496,7 @@ function renderTiles() {
     tile('Environment', (ENV_STYLE[env.status] || [0, 0, pretty(env.status)])[2], env.raw_adc != null ? `${env.raw_adc} ADC counts` : 'No reading', (ENV_STYLE[env.status] || [''])[0], (ENV_STYLE[env.status] || ['', ''])[1]),
     tile('Active incidents', String((c.open || 0) + (c.acknowledged || 0)), `${c.open || 0} open, ${c.acknowledged || 0} acknowledged, ${c.closed || 0} closed`),
   );
+  renderGuide();
 }
 function renderRF() {
   const st = S.status; if (!st) return; const rf = st.rf || {}, f = rf.features || {}, [ic, col] = RF_STYLE[rf.state] || ['', 'var(--text-3)'];
@@ -473,7 +566,7 @@ function renderDetail() {
   }
   if (d.status !== 'closed') {
     const ta = h('textarea', { id: 'noteText', maxlength: '500', 'aria-label': 'Operator note', placeholder: 'Add an operator note (up to 500 characters)' });
-    D.append(h('div', { class: 'field' }, ta, h('div', {}, h('button', { class: 'btn small', type: 'button', onclick: async () => { const text = ta.value.trim(); if (!text) return; try { await post(`/api/incidents/${d.id}/notes`, { text }); ta.value = ''; await refreshAll(); } catch (e) { toast(e.message); } } }, 'Add note'))));
+    D.append(h('div', { class: 'field' }, ta, h('div', {}, h('button', { class: 'btn small', type: 'button', onclick: async () => { const text = ta.value.trim(); if (!text) return; try { await post(`/api/incidents/${d.id}/notes`, { text }); ta.value = ''; toast('Note added to the incident.', true); await refreshAll(); } catch (e) { toast(e.message); } } }, 'Add note'))));
   }
 }
 function detailLine(o) {
@@ -524,24 +617,24 @@ function renderPhysical() {
   add('Backend cycle', st.performance ? `${st.performance.tick_ms} ms` : '--');
   const cl = st.csi_link || {}; if (cl.error) add('ESP32 link', cl.error); else if (cl.state) add('ESP32 link', `${pretty(cl.state)}${cl.port ? ` on ${cl.port}` : ''}`);
 }
-function renderAll() { renderTop(); renderTiles(); renderRF(); renderEnv(); renderIncidents(); renderDetail(); renderEvents(); renderCommands(); renderNodes(); renderPhysical(); }
+function renderAll() { renderGuide(); renderTop(); renderTiles(); renderRF(); renderEnv(); renderIncidents(); renderDetail(); renderEvents(); renderCommands(); renderNodes(); renderPhysical(); }
 
 /* ---------- actions ---------- */
 async function selectIncident(id) { S.selected = id; try { S.detail = await api(`/api/incidents/${id}`); } catch (e) { S.detail = null; toast(e.message); } renderIncidents(); renderDetail(); renderEvents(); }
-async function ackIncident(id) { try { await post(`/api/incidents/${id}/acknowledge`, {}); await refreshAll(); } catch (e) { toast(e.message); } }
-async function closeIncident(id) { try { await post(`/api/incidents/${id}/close`, {}); await refreshAll(); } catch (e) { toast(e.message); } }
+async function ackIncident(id) { try { await post(`/api/incidents/${id}/acknowledge`, {}); toast('Acknowledged. The record now shows a person has looked. Close the incident once it is handled.', true); await refreshAll(); } catch (e) { toast(e.message); } }
+async function closeIncident(id) { try { await post(`/api/incidents/${id}/close`, {}); toast('Incident closed and kept in the history.', true); await refreshAll(); } catch (e) { toast(e.message); } }
 async function saveNode(id) {
   const g = (k) => $(`ne_${k}`).value.trim(), body = {};
   for (const [k, f] of [['x', 'x_m'], ['y', 'y_m'], ['z', 'z_m'], ['h', 'orientation_deg']]) { if (g(k) !== '') { const v = Number(g(k)); if (!Number.isFinite(v)) return toast(`${f} must be a number`); body[f] = v; } }
   if (g('ant') !== '') body.antenna = g('ant');
   if (!Object.keys(body).length) { S.editNode = null; return renderNodes(); }
-  try { await api(`/api/nodes/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); S.editNode = null; await refreshAll(); } catch (e) { toast(e.message); }
+  try { await api(`/api/nodes/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); S.editNode = null; toast('Node saved.', true); await refreshAll(); } catch (e) { toast(e.message); }
 }
-$('monBtn').addEventListener('click', async () => { try { await post(S.status.monitoring ? '/api/monitoring/stop' : '/api/monitoring/start'); await refreshStatus(); } catch (e) { toast(e.message); } });
+$('monBtn').addEventListener('click', async () => { try { const was = S.status.monitoring; await post(was ? '/api/monitoring/stop' : '/api/monitoring/start'); toast(was ? 'Monitoring stopped. New observations will not open incidents.' : 'Monitoring started. Notable observations will now open incidents.', true); await refreshStatus(); } catch (e) { toast(e.message); } });
 $('newIncBtn').addEventListener('click', () => { $('newSum').value = ''; $('dlgNew').showModal(); $('newSum').focus(); });
 $('fNew').addEventListener('submit', async (e) => { if (e.submitter && e.submitter.value === 'ok') { const summary = $('newSum').value.trim(); try { const d = await post('/api/incidents', { summary }); await refreshAll(); await selectIncident(d.id); } catch (er) { toast(er.message); } } });
 $('inspBtn').addEventListener('click', () => { $('inspNotes').value = ''; $('dlgInsp').showModal(); });
-$('fInsp').addEventListener('submit', async (e) => { if (e.submitter && e.submitter.value === 'ok') { const notes = $('inspNotes').value.trim(); try { const r = await post('/api/inspection/request', notes ? { notes } : {}); await refreshAll(); await selectIncident(r.incident_id); } catch (er) { toast(er.message); } } });
+$('fInsp').addEventListener('submit', async (e) => { if (e.submitter && e.submitter.value === 'ok') { const notes = $('inspNotes').value.trim(); try { const r = await post('/api/inspection/request', notes ? { notes } : {}); toast('Inspection requested. Watch the Device commands list for the Arduino to confirm.', true); await refreshAll(); await selectIncident(r.incident_id); } catch (er) { toast(er.message); } } });
 $('rebaseBtn').addEventListener('click', async () => { try { await post('/api/sensors/rebaseline'); toast('Re-baselining: the sensor will be re-measured after warm-up.'); await refreshStatus(); } catch (e) { toast(e.message); } });
 for (const [btn, box, fn] of [['rfTblBtn', 'rfTable', renderRF], ['envTblBtn', 'envTable', renderEnv]]) $(btn).addEventListener('click', () => { const on = $(box).hidden; $(box).hidden = !on; $(btn).setAttribute('aria-pressed', String(on)); $(btn).textContent = on ? 'Hide table' : 'Table view'; fn(); });
 $('evSel').addEventListener('change', renderEvents);
@@ -549,6 +642,194 @@ for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '*', '#']) $(
 let gasT; $('gasOff').addEventListener('input', (e) => { $('gasOffV').textContent = e.target.value; clearTimeout(gasT); gasT = setTimeout(async () => { try { await post('/api/simulate/gas', { offset: Number(e.target.value) }); } catch (er) { toast(er.message); } }, 250); });
 $('themeBtn').addEventListener('click', () => { const cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); const next = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', next); try { localStorage.setItem('jatayu-theme', next); } catch (_) {} renderRF(); renderEnv(); });
 try { const t = localStorage.getItem('jatayu-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (_) {}
+
+/* ---------- guidance: what to do next, checklist, help, tour, comfort ---------- */
+function openFirstIncident() { const i = S.incidents.find(v => v.status === 'open') || S.incidents[0]; if (i) { selectIncident(i.id); $('incCard').scrollIntoView({ block: 'start', behavior: 'smooth' }); } }
+function buildGuide() {
+  const st = S.status, g = { tone: 'info', icon: 'ℹ', title: '', body: '', list: [], acts: [] };
+  const act = (label, fn, primary) => g.acts.push({ label, fn, primary });
+  const stale = S.lastSnap && (Date.now() / 1000 - S.lastSnap) > 6;
+  if (!st) {
+    Object.assign(g, { tone: 'bad', icon: '✕', title: 'Waiting for the backend', body: 'This page cannot reach the JATAYU backend yet.' });
+    g.list = ['Check the backend window is running: python app.py (add --simulate to try it without hardware).', 'Check you opened the address the backend printed, for example http://127.0.0.1:8000.'];
+    act('Try again', () => refreshAll(), true); return g;
+  }
+  if (stale) {
+    Object.assign(g, { tone: 'bad', icon: '▲', title: 'Data is stale', body: 'The backend has stopped sending updates. Everything shown may be out of date.' });
+    g.list = ['Is the backend window still running?', 'Reload this page once it is.']; act('Reload data', () => refreshAll(), true); return g;
+  }
+  const dev = st.devices || {}, rf = st.rf || {}, env = st.environment || {}, live = st.source !== 'simulated', csi = st.csi_link || {};
+  if (live && dev.esp32 !== 'online') {
+    Object.assign(g, { tone: 'warn', icon: '▲', title: 'The ESP32 is not sending data', body: csi.error ? `Reported problem: ${csi.error}` : 'No CSI packets are arriving yet, so there is nothing to analyse.' });
+    g.list = ['Use a USB data cable (some cables only charge) and plug it into the board.', 'Keep the Wi-Fi hotspot on, set to 2.4 GHz, with the name and password you flashed.', 'Make sure the backend was started with the right port, for example --serial-port COM5, and that no serial monitor is open.', 'Open the Signal lab tab: it shows the board’s own status messages.'];
+    act('Open the Signal lab', () => switchTab('lab'), true); return g;
+  }
+  if (!st.monitoring) {
+    Object.assign(g, { tone: 'info', icon: '▶', title: 'Start monitoring', body: 'The page is watching, but nothing is turned into an incident until monitoring is on.' });
+    g.list = ['Press Start monitoring (top right) or key 1 on the Arduino keypad.'];
+    act('Start monitoring', () => $('monBtn').click(), true); return g;
+  }
+  const open = (st.incident_counts || {}).open || 0;
+  if (open > 0) {
+    Object.assign(g, { tone: 'warn', icon: '◆', title: `${open} incident${open > 1 ? 's' : ''} to review`, body: 'Something notable was recorded. A person should look at the evidence, then acknowledge it.' });
+    g.list = ['Open the incident and read its evidence.', 'Add a note about what you checked.', 'Press Acknowledge. Close it when it has been handled.'];
+    act('Open the incident', openFirstIncident, true); return g;
+  }
+  if (env.status === 'WARMING_UP' || env.status === 'BASELINING') {
+    Object.assign(g, { tone: 'info', icon: '◔', title: 'The gas sensor is warming up', body: `Readings are not meaningful yet. ${env.warmup_remaining_s ? `About ${Math.round(env.warmup_remaining_s)} seconds left.` : 'It is measuring its baseline.'}` });
+    return g;
+  }
+  if (rf.state === 'REVIEW_RECOMMENDED' || rf.state === 'PERIODIC_PATTERN_OBSERVED') {
+    Object.assign(g, { tone: 'warn', icon: '◆', title: 'A regular RF pattern is being observed', body: `Signal quality is ${rf.data_quality || 'unknown'}. A regular pattern can come from a person, a fan or other movement, so treat it as a reason to look, not as proof.` });
+    g.list = ['Check the quality is Good or Fair before trusting it.', 'If it holds for 20 seconds, an incident opens by itself.'];
+    return g;
+  }
+  if (rf.state === 'LOW_QUALITY') {
+    Object.assign(g, { tone: 'warn', icon: '▲', title: 'The signal is too weak to judge', body: 'Packet rate is low or too many packets are being lost, so the RF result is ignored.' });
+    g.list = ['Move the ESP32 closer to the router.', 'Reduce other Wi-Fi traffic or switch the hotspot to a quieter channel.']; return g;
+  }
+  Object.assign(g, { tone: 'ok', icon: '✓', title: 'All quiet', body: 'Monitoring is on and nothing needs your attention. An incident will open by itself if a regular pattern holds or the gas reading rises.' });
+  g.list = ['Before real use, record an empty-room baseline in the Signal lab tab (Calibration card).'];
+  act('Open the Signal lab', () => switchTab('lab')); return g;
+}
+let guideSig = '';
+function renderGuide() {
+  const c = $('coach'); if (!c) return;
+  const g = buildGuide(), sig = JSON.stringify([g.tone, g.title, g.body, g.list, g.acts.map(a => a.label)]);
+  if (sig !== guideSig) {
+    guideSig = sig; c.className = 'card c8 coach tone-' + g.tone;
+    clear(c).append(h('div', { class: 'ico', 'aria-hidden': 'true', text: g.icon }),
+      h('div', { style: 'min-width:0' }, h('div', { class: 'muted small', text: 'What to do next' }), h('h2', { text: g.title }), h('p', { text: g.body }),
+        g.list.length ? h('ul', {}, g.list.map(t => h('li', { text: t }))) : null,
+        g.acts.length ? h('div', { class: 'actions' }, g.acts.map(a => h('button', { class: 'btn small' + (a.primary ? ' primary' : ''), type: 'button', onclick: a.fn, text: a.label }))) : null));
+  }
+  renderChecklist();
+}
+let checkSig = '';
+function renderChecklist() {
+  const st = S.status || {}, dev = st.devices || {}, rf = st.rf || {}, env = st.environment || {}, stale = S.lastSnap && (Date.now() / 1000 - S.lastSnap) > 6;
+  const items = [
+    ['Backend reachable', !!S.status && !stale, 'Start it with: python app.py'],
+    ['ESP32 streaming CSI', dev.esp32 === 'online', 'Check the USB data cable and the hotspot'],
+    ['Signal quality good or fair', ['good', 'fair'].includes(rf.data_quality), 'Move closer to the router'],
+    ['Arduino connected', dev.arduino === 'online', 'Optional until the Mega is set up'],
+    ['Gas sensor ready', ['NORMAL', 'ELEVATED'].includes(env.status), env.status === 'WARMING_UP' ? `Warming up, ${Math.round(env.warmup_remaining_s || 0)} s left` : 'Needs the Arduino and about 2 minutes'],
+    ['Monitoring on', !!st.monitoring, 'Press Start monitoring at the top'],
+  ];
+  const sig = JSON.stringify(items.map(i => [i[1], i[1] ? '' : i[2]])); if (sig === checkSig) return; checkSig = sig;
+  const done = items.filter(i => i[1]).length, box = clear($('checklist'));
+  box.append(h('div', { class: 'head' }, h('h2', { text: 'Setup checklist' }), h('span', { class: 'muted small', text: `${done} of ${items.length} ready` })),
+    h('div', { class: 'meter', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(items.length), 'aria-valuenow': String(done), 'aria-label': 'Setup progress' }, h('span', { style: `width:${(done / items.length) * 100}%` })),
+    h('ul', { class: 'check' }, items.map(i => h('li', {}, h('span', { class: 'mk', 'aria-hidden': 'true', style: `color:${i[1] ? 'var(--good)' : 'var(--text-3)'}`, text: i[1] ? '✓' : '○' }),
+      h('span', {}, h('span', { text: i[0] }), h('span', { class: 'sr', text: i[1] ? ' (ready)' : ' (not ready)' }), i[1] ? null : h('div', { class: 'hint', text: i[2] }))))));
+}
+
+/* ---------- tabs ---------- */
+function switchTab(which) {
+  const lab = which === 'lab';
+  $('tabOv').setAttribute('aria-selected', String(!lab)); $('tabLab').setAttribute('aria-selected', String(lab));
+  $('paneOverview').hidden = lab; $('paneLab').hidden = !lab;
+  if (lab && !$('labFrame').getAttribute('src')) $('labFrame').setAttribute('src', '/csi?embed=1');
+  if (!lab) { renderRF(); renderEnv(); }
+  window.scrollTo({ top: 0 });
+}
+$('tabOv').addEventListener('click', () => switchTab('ov')); $('tabLab').addEventListener('click', () => switchTab('lab'));
+for (const id of ['tabOv', 'tabLab']) $(id).addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const lab = id === 'tabOv'; switchTab(lab ? 'lab' : 'ov'); $(lab ? 'tabLab' : 'tabOv').focus(); } });
+
+/* ---------- card help buttons ---------- */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.help-btn'); if (!b) return;
+  const box = document.getElementById(b.getAttribute('aria-controls')); if (!box) return;
+  const open = box.hidden; box.hidden = !open; b.setAttribute('aria-expanded', String(open));
+});
+
+/* ---------- comfort: simple/detailed view, text size ---------- */
+function store(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+function setView(simple) { document.body.classList.toggle('simple', simple); $('vSimple').setAttribute('aria-pressed', String(simple)); $('vDetail').setAttribute('aria-pressed', String(!simple)); store('jatayu-view', simple ? 'simple' : 'detail'); }
+$('vSimple').addEventListener('click', () => setView(true)); $('vDetail').addEventListener('click', () => { setView(false); renderRF(); renderEnv(); });
+const FS = [13, 14, 16, 18, 20]; let fsI = Math.max(0, FS.indexOf(Number(load('jatayu-fs')) || 14));
+function setFs(i) { fsI = Math.max(0, Math.min(FS.length - 1, i)); document.documentElement.style.setProperty('--fs', FS[fsI] + 'px'); store('jatayu-fs', FS[fsI]); $('fsDown').disabled = fsI === 0; $('fsUp').disabled = fsI === FS.length - 1; }
+$('fsDown').addEventListener('click', () => { setFs(fsI - 1); renderRF(); renderEnv(); }); $('fsUp').addEventListener('click', () => { setFs(fsI + 1); renderRF(); renderEnv(); });
+setFs(fsI); setView(load('jatayu-view') === 'simple');
+
+/* ---------- help and glossary ---------- */
+function buildHelp() {
+  const B = clear($('helpBody')), dl = (rows) => h('dl', { class: 'gl' }, rows.map(r => [h('dt', { text: r[0] }), h('dd', { text: r[1] })]));
+  B.append(h('h2', { id: 'hlpT', text: 'How to use this page' }),
+    h('p', { class: 'muted', style: 'margin:0', text: 'JATAYU shows what its sensors observe and keeps a record of what people did about it. It never decides anything for you.' }),
+    h('h3', { text: 'Start here' }),
+    h('ol', {}, [
+      'Read the box called "What to do next". It always names the single most useful action.',
+      'Watch the Setup checklist fill in: backend, ESP32, signal quality, Arduino, gas sensor, monitoring.',
+      'Press Start monitoring (top right). Nothing becomes an incident until monitoring is on.',
+      'Before real use, open the Signal lab tab and record a 30-second empty-room baseline in the Calibration card.',
+      'When an incident appears, open it, read the evidence, add a note, then Acknowledge. Close it when handled.',
+    ].map(t => h('li', { text: t }))),
+    h('h3', { text: 'Finding your way around' }),
+    dl([['Overview tab', 'Status tiles, the RF and gas cards, incidents, timeline, commands, nodes.'], ['Signal lab tab', 'The original live view: waveform, spectrum, 3D projection, calibration and simulation controls.'], ['Simple / Detailed', 'Simple hides charts, commands, nodes and physical controls so only the essentials remain.'], ['A+ / A−', 'Makes all text larger or smaller. Your choice is remembered.'], ['? buttons', 'Each card has one. It explains that card in plain words.'], ['Tour', 'A one-minute guided walk through the page.']]),
+    h('h3', { text: 'RF states' }),
+    dl([['No data', 'Nothing is coming from the ESP32.'], ['Collecting', 'Warming up. About 30 seconds of signal are needed.'], ['Insufficient data', 'Not enough good packets to judge.'], ['Low quality', 'Signal too weak or too many packets lost. Ignore the pattern and fix the signal.'], ['No clear periodic pattern', 'Nothing regular is happening in the signal.'], ['Periodic pattern observed', 'A regular repeating change. It could be a person, a fan or other movement.'], ['Review recommended', 'The pattern has held for 20 seconds or more. A person should look.']]),
+    h('h3', { text: 'Quality, confidence and gas' }),
+    dl([['Data quality', 'Whether the signal is good enough to trust: Good, Fair, Low or None.'], ['Confidence', 'How clean and consistent the evidence is. It is not the chance that a person is present.'], ['Raw ADC counts', 'The gas sensor’s electrical reading from 0 to 1023. It is not a gas amount.'], ['Warming up / Baselining', 'The sensor needs about two minutes, then learns what is normal in this place.'], ['Elevated', 'The reading rose well above its baseline. It does not name the gas or indicate a person.'], ['Stale', 'No fresh reading arrived recently. Do not rely on the old number.']]),
+    h('h3', { text: 'Incidents and commands' }),
+    dl([['Open', 'Needs a person to look.'], ['Acknowledged', 'A person has looked. New evidence reopens it.'], ['Closed', 'Handled and kept in the history. Needs an acknowledgement first.'], ['Created, sent, received, executed', 'The steps a command to the Arduino goes through.'], ['Failed / timed out', 'The device never confirmed. This is shown rather than hidden.']]),
+    h('h3', { text: 'When something looks wrong' }),
+    h('ul', {}, [
+      'ESP32 offline: use a USB data cable, keep the 2.4 GHz hotspot on, start the backend with the right COM port, close any serial monitor.',
+      'Signal quality Low: move the ESP32 closer to the router and reduce other Wi-Fi traffic.',
+      'Gas sensor not ready: the Arduino must be connected, then wait about two minutes.',
+      'Red "Data is stale" bar: the backend stopped; check its window.',
+      'Yellow SIMULATED DATA badge: you are looking at fake data for practice, not real hardware.',
+    ].map(t => h('li', { text: t }))),
+    h('h3', { text: 'What this is not' }),
+    h('p', { class: 'sec', text: 'JATAYU is an experimental prototype. A pattern is not proof of a person or of breathing. Gas readings are uncalibrated. Do not use it for rescue, triage or safety decisions.' }));
+}
+$('helpBtn').addEventListener('click', () => { buildHelp(); $('dlgHelp').showModal(); });
+$('hlpClose').addEventListener('click', () => $('dlgHelp').close());
+$('hlpTour').addEventListener('click', () => { $('dlgHelp').close(); startTour(); });
+
+/* ---------- guided tour ---------- */
+const TOUR = [
+  { sel: '#coach', title: 'Start here', text: 'This box reads the live system and tells you the one most useful thing to do right now. It changes as things change.' },
+  { sel: '#checklist', title: 'Setup checklist', text: 'Six quick checks. Anything not ready shows a hint under it, so you know what to fix first.' },
+  { sel: '#monBtn', title: 'Start and stop monitoring', text: 'Nothing becomes an incident until monitoring is on. You can also press key 1 on the Arduino.' },
+  { sel: '#tiles', title: 'Status at a glance', text: 'Six tiles: is monitoring on, are the two boards online, what the RF state is, the gas status, and how many incidents need attention.' },
+  { sel: '#rfCard', title: 'RF observation', text: 'Whether Wi-Fi signal changes repeat in a regular pattern. Check Data quality first. Press the ? for plain-language help.' },
+  { sel: '#envCard', title: 'Gas sensor', text: 'A raw reading with a learned baseline. It needs about two minutes to warm up. It is not a gas amount and not evidence of a person.' },
+  { sel: '#incCard', title: 'Incidents', text: 'Open an incident to read its evidence, add notes, then Acknowledge. Close it when handled. You can also open one yourself.' },
+  { sel: '#evCard', title: 'Event timeline', text: 'Everything that happened, newest first. This is your audit trail and cannot be edited.' },
+  { sel: '#tabLab', title: 'Signal lab', text: 'The original live view with the waveform, spectrum, 3D projection and Calibration. Record an empty-room baseline here before real use.' },
+  { sel: '#helpBtn', title: 'Help any time', text: 'The help guide explains every term. The A+ button makes text larger, and Simple view hides the detail.' },
+];
+let tourI = 0, tourSteps = [];
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function startTour() { switchTab('ov'); tourSteps = TOUR.filter(s => { const el = document.querySelector(s.sel); return el && el.getClientRects().length; }); tourI = 0; $('welcome').classList.remove('on'); store('jatayu-tour', 'done'); $('spot').hidden = false; $('tour').hidden = false; showStep(); }
+function endTour() { $('spot').hidden = true; $('tour').hidden = true; $('tourBtn').focus(); }
+function showStep() {
+  const s = tourSteps[tourI], el = document.querySelector(s.sel);
+  $('tourT').textContent = s.title; $('tourP').textContent = s.text; $('tourN').textContent = `${tourI + 1} of ${tourSteps.length}`;
+  $('tourBack').disabled = tourI === 0; $('tourNext').textContent = tourI === tourSteps.length - 1 ? 'Done' : 'Next';
+  el.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  setTimeout(() => {
+    const r = el.getBoundingClientRect(), pad = 6, sp = $('spot'), tb = $('tour');
+    Object.assign(sp.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + 2 * pad + 'px', height: r.height + 2 * pad + 'px' });
+    const th = tb.offsetHeight, tw = tb.offsetWidth; let top = r.bottom + 14;
+    if (top + th > innerHeight - 8) top = r.top - th - 14; if (top < 8) top = Math.max(8, innerHeight - th - 8);
+    tb.style.top = top + 'px'; tb.style.left = Math.min(Math.max(8, r.left), innerWidth - tw - 8) + 'px';
+    $('tourNext').focus();
+  }, reduceMotion() ? 50 : 380);
+}
+$('tourNext').addEventListener('click', () => { if (tourI >= tourSteps.length - 1) endTour(); else { tourI++; showStep(); } });
+$('tourBack').addEventListener('click', () => { if (tourI > 0) { tourI--; showStep(); } });
+$('tourSkip').addEventListener('click', endTour);
+document.addEventListener('keydown', (e) => { if ($('tour').hidden) return; if (e.key === 'Escape') endTour(); else if (e.key === 'ArrowRight') $('tourNext').click(); else if (e.key === 'ArrowLeft') $('tourBack').click(); });
+addEventListener('resize', () => { if (!$('tour').hidden) showStep(); });
+$('tourBtn').addEventListener('click', startTour);
+$('welTour').addEventListener('click', startTour);
+$('welSkip').addEventListener('click', () => { $('welcome').classList.remove('on'); store('jatayu-tour', 'done'); });
+if (load('jatayu-tour') !== 'done') $('welcome').classList.add('on');
+renderGuide();
 
 /* ---------- data ---------- */
 async function refreshStatus() { try { S.status = await api('/api/status'); S.lastSnap = Date.now() / 1000; renderTop(); renderTiles(); renderRF(); renderEnv(); renderPhysical(); } catch (e) { renderTop(); } }

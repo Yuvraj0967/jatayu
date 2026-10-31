@@ -17,7 +17,7 @@ Built on the RescueSense CSI pipeline; the DSP and acquisition firmware were ext
 | `backend/` | CSI DSP + JATAYU layer (Arduino link, SQLite, fusion, incidents, REST/WebSocket) |
 | `dashboard/` | Operator console (single page, no build step) |
 | `tools/` | PowerShell setup/build/flash/run scripts (Windows) |
-| `docs/` | [architecture](docs/architecture.md), [ESP32 node](docs/esp32-node.md), [hardware](docs/hardware.md), [firmware setup](docs/firmware-setup.md), [calibration](docs/calibration.md), [demo](docs/demo-script.md), [failure modes](docs/failure-modes.md) |
+| `docs/` | [architecture](docs/architecture.md), [ESP32 node](docs/esp32-node.md), [hardware](docs/hardware.md), [firmware setup](docs/firmware-setup.md), [calibration](docs/calibration.md), [demo](docs/demo-script.md), [failure modes](docs/failure-modes.md), [Lovable prompt](docs/lovable-prompt.md) |
 
 ## Quick start (no hardware)
 
@@ -28,7 +28,7 @@ python app.py --simulate        # everything is badged "simulated"
 python -m pytest tests          # needs: pip install pytest httpx
 ```
 
-Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment, incidents, timeline, commands, nodes). The original CSI view and calibration page is at `/csi`. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
+Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment, incidents, timeline, commands, nodes). The console explains itself: a "What to do next" box, a setup checklist, a guided tour, a help glossary, Simple/Detailed view and a text-size control. The original live signal view (waveform, spectrum, 3D view, calibration) is kept as the **Signal lab** tab and is also available on its own at `/csi`. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
 
 ## Live hardware
 
