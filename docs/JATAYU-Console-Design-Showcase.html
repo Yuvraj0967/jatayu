@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JATAYU Console — UI/UX Design Showcase</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; background: #f5f5f5; padding: 40px 20px; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 10px; color: #0b7a52; }
+    .subtitle { font-size: 1.1rem; color: #666; margin-bottom: 40px; }
+    h2 { font-size: 1.8rem; font-weight: 600; margin-top: 50px; margin-bottom: 20px; color: #1a1a1a; border-bottom: 2px solid #42d598; padding-bottom: 10px; }
+    h3 { font-size: 1.3rem; font-weight: 600; margin-top: 30px; margin-bottom: 15px; color: #333; }
+    p { margin-bottom: 15px; color: #444; }
+    .screenshot { width: 100%; margin: 30px 0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: 1px solid #e0e0e0; }
+    .color-palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 30px 0; }
+    .color-swatch { padding: 20px; border-radius: 8px; text-align: center; font-weight: 600; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .color-swatch .hex { display: block; margin-top: 8px; font-size: 0.8rem; opacity: 0.8; font-family: monospace; }
+    .feature-list { list-style: none; margin: 20px 0; }
+    .feature-list li { padding: 12px 0 12px 35px; position: relative; border-bottom: 1px solid #f0f0f0; }
+    .feature-list li:before { content: "✓"; position: absolute; left: 0; color: #42d598; font-weight: bold; font-size: 1.2rem; }
+    .specs { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 30px 0; }
+    .specs table { width: 100%; border-collapse: collapse; }
+    .specs td { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+    .specs td:first-child { font-weight: 600; width: 40%; color: #555; }
+    .footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #e0e0e0; text-align: center; color: #888; font-size: 0.9rem; }
+    @media print { body { background: white; padding: 0; } .container { box-shadow: none; padding: 40px; } .screenshot { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>JATAYU Console</h1>
+    <p class="subtitle">Site Monitoring Console — UI/UX Design Showcase</p>
+    <h2>Overview</h2>
+    <p>JATAYU is an operator console for a prototype site-monitoring system featuring ESP32 CSI sensors and Arduino Mega gas sensors. The console provides auditable incident management for human review with a clean, modern interface inspired by HealthifyMe's design language.</p>
+    <h2>Design Philosophy</h2>
+    <ul class="feature-list">
+      <li><strong>Credible field-instrument aesthetic</strong> — Dense, information-rich layout without visual noise</li>
+      <li><strong>Honest language</strong> — Clear, factual copy that doesn't overpromise</li>
+      <li><strong>Accessibility-first</strong> — WCAG AA contrast, keyboard navigation, screen reader support</li>
+      <li><strong>Mobile-responsive</strong> — Works on 390px screens with horizontal scroll for data tables</li>
+      <li><strong>Offline-capable</strong> — No external fonts or CDNs, works without internet</li>
+      <li><strong>Theme support</strong> — Daylight and Low light modes with system preference detection</li>
+    </ul>
+    <h2>Color Palette</h2>
+    <div class="color-palette">
+      <div class="color-swatch" style="background: #42d598; color: #07140e;">Mint<span class="hex">#42D598</span></div>
+      <div class="color-swatch" style="background: #e9f0ef; color: #0b7a52;">Mint Soft<span class="hex">#E9F0EF</span></div>
+      <div class="color-swatch" style="background: #0b7a52; color: white;">Mint Deep<span class="hex">#0B7A52</span></div>
+      <div class="color-swatch" style="background: #fdfbfd; color: #0c0a09; border: 1px solid #ece8ea;">Canvas<span class="hex">#FDFBFD</span></div>
+      <div class="color-swatch" style="background: #ffffff; color: #0c0a09; border: 1px solid #ece8ea;">Panel<span class="hex">#FFFFFF</span></div>
+      <div class="color-swatch" style="background: #f4f7f5; color: #0c0a09;">Panel Alt<span class="hex">#F4F7F5</span></div>
+      <div class="color-swatch" style="background: #0c0a09; color: white;">Ink<span class="hex">#0C0A09</span></div>
+      <div class="color-swatch" style="background: #6f6b6a; color: white;">Muted<span class="hex">#6F6B6A</span></div>
+    </div>
+    <h2>Screenshots</h2>
+    <h3>Desktop — Daylight Theme</h3><img src="../console/shots/healthify-daylight.png" alt="JATAYU Console Desktop Daylight" class="screenshot">
+    <h3>Desktop — Low Light Theme</h3><img src="../console/shots/healthify-lowlight.png" alt="JATAYU Console Desktop Low Light" class="screenshot">
+    <h3>Settings Dialog</h3><img src="../console/shots/healthify-settings.png" alt="JATAYU Console Settings Dialog" class="screenshot">
+    <h3>Mobile — 390px Maximum Text Size</h3><img src="../console/shots/healthify-mobile390.png" alt="JATAYU Console Mobile" class="screenshot">
+    <h2>Key Features</h2>
+    <h3>Next Action Guidance</h3><p>Mint-tinted card that guides operators to the most important action, with clear priority ordering and contextual help.</p>
+    <h3>Setup Checklist</h3><p>Visual progress indicator showing system readiness across 6 checkpoints: backend connectivity, ESP32 streaming, signal quality, Arduino connection, gas sensor status, and monitoring state.</p>
+    <h3>RF Observation Panel</h3><p>Real-time periodicity score, pattern detection, confidence metrics, and live chart with periodicity history. Clear status indicators (Collecting, No clear pattern, Review, Pattern detected).</p>
+    <h3>Environmental Sensor</h3><p>Raw ADC readings, baseline tracking, elevated threshold monitoring, and warming-up state management. Chart shows readings over time with threshold visualization.</p>
+    <h3>Incident Management</h3><p>Two-column layout with incident ledger and detailed view. Evidence tracking, operator acknowledgements, note-taking, and audit trail. Status workflow: Open → Acknowledged → Closed.</p>
+    <h3>Event Timeline</h3><p>Complete audit trail of all system events: monitoring state changes, RF observations, command lifecycle, incident creation/acknowledgement/closure. Filterable by selected incident.</p>
+    <h3>Device Commands</h3><p>Command queue showing lifecycle: Created → Sent → Received → Executed → Acknowledged. Target device identification and failure tracking.</p>
+    <h3>Sensor Nodes</h3><p>Editable node registry with position (x, y, z), heading, antenna type, firmware version, and last-seen timestamp. Inline editing with validation.</p>
+    <h2>Typography</h2><div class="specs"><table><tr><td>Display Font</td><td>Poppins, Avenir Next, Century Gothic (local fallbacks)</td></tr><tr><td>Body Font</td><td>Plus Jakarta Sans, Segoe UI Variable Text, system-ui</td></tr><tr><td>Monospace</td><td>JetBrains Mono, Consolas, monospace (for machine data)</td></tr><tr><td>Base Size</td><td>16px (scales 14px–18px via A−/A+ controls)</td></tr><tr><td>Line Height</td><td>1.5 body, 1.3 headings</td></tr></table></div>
+    <h2>Component Specifications</h2><div class="specs"><table><tr><td>Card Radius</td><td>16px</td></tr><tr><td>Button Radius</td><td>999px (pill)</td></tr><tr><td>Input Radius</td><td>10px</td></tr><tr><td>Shadow (default)</td><td>0 8px 24px rgba(12,10,9,0.06)</td></tr><tr><td>Shadow (sm)</td><td>0 1px 2px rgba(12,10,9,0.05)</td></tr><tr><td>Shadow (lg)</td><td>0 24px 64px rgba(12,10,9,0.18)</td></tr><tr><td>Min Touch Target</td><td>44×44px</td></tr><tr><td>Grid Gap</td><td>16px</td></tr></table></div>
+    <h2>Responsive Breakpoints</h2><div class="specs"><table><tr><td>Mobile</td><td>390px (tested at max text size 18px)</td></tr><tr><td>Tablet</td><td>768px</td></tr><tr><td>Desktop</td><td>1440px</td></tr><tr><td>Large Desktop</td><td>1520px (max-width)</td></tr></table></div>
+    <h2>Accessibility</h2><ul class="feature-list"><li>WCAG AA contrast ratios (4.5:1 minimum)</li><li>Keyboard navigation with visible focus rings (2px mint outline)</li><li>ARIA labels on all interactive elements</li><li>Screen reader announcements for dynamic content</li><li>Reduced motion support via prefers-reduced-motion</li><li>Semantic HTML structure (header, main, section, nav)</li><li>Form labels and error messages</li></ul>
+    <h2>Technical Stack</h2><div class="specs"><table><tr><td>Frontend</td><td>React 19 + TypeScript (strict mode)</td></tr><tr><td>Build Tool</td><td>Vite 6</td></tr><tr><td>Styling</td><td>Tailwind CSS 3.4 + CSS custom properties</td></tr><tr><td>Testing</td><td>Vitest 2.1 (17 tests passing)</td></tr><tr><td>Bundle Size</td><td>CSS 21.69 kB, JS 330.28 kB (gzipped: 5.64 kB + 100.39 kB)</td></tr><tr><td>Backend</td><td>Python (FastAPI, WebSocket, SQLite)</td></tr><tr><td>Hardware</td><td>ESP32 (CSI), Arduino Mega (gas sensor)</td></tr></table></div>
+    <div class="footer"><p>JATAYU Console — Experimental Prototype</p><p>Design inspired by HealthifyMe's clean, friendly aesthetic</p><p>Repository: github.com/Yuvraj0967/jatayu</p></div>
+  </div>
+</body>
+</html>
