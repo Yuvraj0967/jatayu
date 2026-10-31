@@ -677,3 +677,14 @@ def test_signal_view_has_gas_card_and_no_gas_concentration_claim():
     assert 'id="gasCard"' in page and "/api/sensors/history" in page and "Not a gas concentration" in page
     assert "ppm" not in page.lower()
 
+
+@pytest.mark.parametrize("page,sections", [
+    ("console.html", ["envCard", "rfCard", "tiles", "incCard", "evCard"]),
+    ("index.html", ["gasCard", "hero", "deviceLog", "evTitle", "heatTitle"]),
+])
+def test_keypad_sections_exist_on_each_page(page, sections):
+    html = (Path(__file__).resolve().parents[2] / "dashboard" / page).read_text(encoding="utf-8")
+    assert "jumpToKeySection" in html
+    for section in sections:
+        assert f'id="{section}"' in html and f"'{section}'" in html
+

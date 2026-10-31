@@ -500,6 +500,7 @@ function renderTiles() {
   );
   renderGuide();
   showLives(st.lives);
+  jumpToKeySection(st.last_key);
 }
 function renderRF() {
   const st = S.status; if (!st) return; const rf = st.rf || {}, f = rf.features || {}, [ic, col] = RF_STYLE[rf.state] || ['', 'var(--text-3)'];
@@ -864,7 +865,24 @@ function connect() {
   ws.onclose = () => { S.ws = 'lost'; renderTop(); setTimeout(connect, Math.min(10000, 1000 * ++wsRetry)); };
   ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
-// Lives-saved popup, from keypad codes 01-09 (undo with 00).
+// Keypad 3, 5, 6, 7 and 9 open the matching section of this page.
+    const KEY_SECTIONS = { SHOW_SENSOR_STATUS: 'envCard', SHOW_RF_STATUS: 'rfCard', SHOW_SYSTEM_STATUS: 'tiles', SHOW_INCIDENT_SUMMARY: 'incCard', DIAGNOSTICS: 'evCard' };
+    let keySeen = null;
+    function jumpToKeySection(lastKey) {
+      const at = lastKey ? lastKey.at : 0;
+      if (keySeen === null) { keySeen = at; return; }
+      if (at === keySeen) return;
+      keySeen = at;
+      const el = document.getElementById(KEY_SECTIONS[lastKey.action]);
+      if (!el || new URLSearchParams(location.search).get('embed') === '1') return;
+      if ($('paneOverview').hidden) switchTab('ov');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid #34d399'; el.style.outlineOffset = '3px';
+      clearTimeout(jumpToKeySection.t);
+      jumpToKeySection.t = setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 3000);
+    }
+
+    // Lives-saved popup, from keypad codes 01-09 (undo with 00).
     let livesSeen = null;
     function showLives(lives) {
       const last = lives && lives.last;

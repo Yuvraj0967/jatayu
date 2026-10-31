@@ -68,6 +68,18 @@ One trial, own room with other people nearby. **No breathing rhythm was found in
 
 The estimates are too scattered to report as rates. No hand count was recorded.
 
+## Keypad sections
+
+Keys open the matching section and highlight it for 3 seconds:
+
+| Key | Console (`/`) | Signal view (`/csi`) |
+| --- | --- | --- |
+| `3` sensor | Environmental sensor | Gas sensor |
+| `5` RF | RF observation | Reading and scores |
+| `6` system | Status tiles | Device messages |
+| `7` incidents | Incidents | Event log |
+| `9` diagnostics | Event timeline | Subcarrier activity |
+
 ## Keypad reports
 
 Press `0` then a digit within 3 seconds to report lives saved: `02` shows a "2 lives saved" popup on every open page

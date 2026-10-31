@@ -629,6 +629,7 @@
       const jat = d.jatayu || {};
       $('mKeypad').textContent = `${jat.last_key ? jat.last_key.key : '--'} / ${(jat.lives || {}).total || 0}`;
       showLives(jat.lives);
+      jumpToKeySection(jat.last_key);
       $('mDropped').textContent = `${link.dropped_width || 0} odd · ${link.gain_steps_corrected || 0} steps`;
       $('sourceNote').textContent = d.serial && d.serial.port ? `USB @ ${d.serial.baud}` : '';
       const lines = [];
@@ -741,6 +742,22 @@
       drawGas(env.threshold_adc);
     }
     $('gasRebase').addEventListener('click', () => { fetch('/api/sensors/rebaseline', { method: 'POST' }).then(() => toast('Measuring a new baseline after warm-up.')).catch(() => toast('Could not reach the backend.', true)); });
+
+    // Keypad 3, 5, 6, 7 and 9 open the matching section of this page.
+    const KEY_SECTIONS = { SHOW_SENSOR_STATUS: 'gasCard', SHOW_RF_STATUS: 'hero', SHOW_SYSTEM_STATUS: 'deviceLog', SHOW_INCIDENT_SUMMARY: 'evTitle', DIAGNOSTICS: 'heatTitle' };
+    let keySeen = null;
+    function jumpToKeySection(lastKey) {
+      const at = lastKey ? lastKey.at : 0;
+      if (keySeen === null) { keySeen = at; return; }
+      if (at === keySeen) return;
+      keySeen = at;
+      const el = document.getElementById(KEY_SECTIONS[lastKey.action]);
+      if (!el || new URLSearchParams(location.search).get('embed') === '1') return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid #34d399'; el.style.outlineOffset = '3px';
+      clearTimeout(jumpToKeySection.t);
+      jumpToKeySection.t = setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 3000);
+    }
 
     // Lives-saved popup, from keypad codes 01-09 (undo with 00).
     let livesSeen = null;
