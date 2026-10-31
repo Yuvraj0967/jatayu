@@ -31,6 +31,14 @@ except ImportError:  # pragma: no cover - exercised only without pyserial instal
 _NUMBER = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
 
 # USB-to-UART bridges used on ESP32-S3 dev boards, plus the S3's own USB.
+# Hard limits on what is accepted from the board. A row outside them is corrupt
+# and is counted as dropped, never passed to the analysis.
+MAX_LINE_CHARS = 2000  # firmware's own limit is 1200
+MAX_SUBCARRIERS = 128
+MAX_AMPLITUDE = 10000.0  # firmware saturates at 9999.9
+RSSI_LIMITS_DBM = (-127.0, 0.0)
+WIFI_CHANNELS = (1, 14)
+
 USB_BRIDGES = {
     0x10C4: "Silicon Labs CP210x",
     0x1A86: "WCH CH34x / CH9102",
@@ -212,6 +220,10 @@ class CSIStreamParser:
         text = line.strip().lstrip("﻿")
         if not text:
             return None
+        if len(text) > MAX_LINE_CHARS:
+            self.dropped += 1
+            self.last_error = "line too long"
+            return None
         if text.startswith(("CSI,", "CSI1,", "CSI_DATA,")):
             try:
                 row = next(csv.reader([text], skipinitialspace=True))
@@ -246,6 +258,12 @@ class CSIStreamParser:
         amplitudes = np.asarray([float(value) for value in values[6:] if value.strip()], dtype=float)
         if not np.all(np.isfinite(amplitudes)):
             raise ValueError("CSI1 line has non-numeric amplitudes")
+        if seq < 0 or amplitudes.size > MAX_SUBCARRIERS:
+            raise ValueError("CSI1 sequence or width out of range")
+        if amplitudes.min() < 0.0 or amplitudes.max() > MAX_AMPLITUDE:
+            raise ValueError("CSI1 amplitude out of range")
+        if not RSSI_LIMITS_DBM[0] <= rssi <= RSSI_LIMITS_DBM[1] or not WIFI_CHANNELS[0] <= channel <= WIFI_CHANNELS[1]:
+            raise ValueError("CSI1 RSSI or channel out of range")
         self.seq.observe(seq)
         return CSIFrame(self.compact_clock.to_host(timestamp_us, host_now), rssi, amplitudes, seq=seq,
                         channel=channel, noise_floor=noise, first_word_invalid=bool(flags & 1))
@@ -518,6 +536,18 @@ class SerialCSIReader:
 # --------------------------------------------------------------------------
 # Simulator
 # --------------------------------------------------------------------------
+
+
+def scenario_bpm(elapsed: float) -> float:
+    """Scripted simulation rate: 14 up to 19 and back over 8 s each, 8 s around 14, then hold."""
+
+    if elapsed < 8.0:
+        return 14.0 + 5.0 * elapsed / 8.0
+    if elapsed < 16.0:
+        return 19.0 - 5.0 * (elapsed - 8.0) / 8.0
+    if elapsed < 24.0:
+        return 14.0 + 0.6 * math.sin(2.0 * math.pi * (elapsed - 16.0) / 2.5)
+    return 14.0
 
 
 @dataclass

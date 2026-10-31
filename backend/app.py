@@ -33,7 +33,7 @@ from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from processing import CSIProcessor, ProcessorConfig
-from serial_io import SerialCSIReader, SimulatedCSIProducer, list_serial_ports
+from serial_io import SerialCSIReader, SimulatedCSIProducer, list_serial_ports, scenario_bpm
 from jatayu.api import LiveHub, build_routes
 from jatayu.arduino_io import ArduinoReader, SimulatedArduino
 from jatayu.service import JatayuService
@@ -44,7 +44,6 @@ DASHBOARD = BACKEND_DIR.parent / "dashboard" / "index.html"
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
     "empty": "No clear periodic pattern",
-    "motion": "Movement detected",
     "warming_up": "Collecting signal",
     "no_signal": "No CSI signal",
 }
@@ -98,6 +97,9 @@ class RescueRuntime:
         self.events: deque[Event] = deque(maxlen=40)
         self._last_state: str | None = None
         self._last_calibration_result: Any = None
+        self.scenario_started: float | None = None
+        # Key 7 on the dashboard: simulated source beside the real one (docs/system-guide.md).
+        self.demo: tuple[SimulatedCSIProducer, CSIProcessor] | None = None
         self.store = Store(options.db_path)
         self.hub = LiveHub()
         self.jatayu = JatayuService(self.store, simulated=options.simulate)
@@ -183,12 +185,22 @@ class RescueRuntime:
     async def _broadcast_loop(self) -> None:
         while True:
             started = time.monotonic()
-            telemetry = await asyncio.to_thread(self.processor.telemetry)
+            demo = self.demo
+            if demo is not None:
+                for frame in demo[0].frames_until(time.monotonic()):
+                    demo[1].add_frame(frame)
+            telemetry = await asyncio.to_thread((demo[1] if demo else self.processor).telemetry)
+            sim = demo[0] if demo else self.simulator
+            if sim is not None and self.scenario_started is not None:
+                value = scenario_bpm(started - self.scenario_started)
+                sim.configure(bpm=value)
+                telemetry.update(state="breathing", bpm=round(value, 1), presence=True)
             self._note_changes(telemetry)
             if self.options.auto_alert and telemetry["presence"] != self.alert_active:
                 await self.set_alert(bool(telemetry["presence"]), origin="auto")
             telemetry.update(self._envelope())
-            snapshot = self.jatayu.tick(telemetry)
+            # Simulated readings from key 7 are never stored as observations.
+            snapshot = self.jatayu.snapshot() if demo else self.jatayu.tick(telemetry)
             await self.hub.broadcast(snapshot)
             telemetry["jatayu"] = snapshot
             self.latest = telemetry
@@ -199,8 +211,8 @@ class RescueRuntime:
         return {
             "type": "telemetry",
             "server_time": time.time(),
-            "source": "simulation" if self.simulator else "serial",
-            "serial": self.reader.status() if self.reader else None,
+            "source": "simulation" if self.simulator or self.demo else "serial",
+            "serial": self.reader.status() if self.reader and not self.demo else None,
             "simulation": (
                 {
                     "present": self.simulator.present,
@@ -265,6 +277,27 @@ class RescueRuntime:
         self.log("calibration", f"Recording {label} for {duration:.0f} s.")
         return status
 
+    async def toggle_demo(self) -> bool:
+        """Switch the dashboard between its real source and the scripted simulation."""
+
+        if self.demo is not None or (self.simulator is not None and self.scenario_started is not None):
+            self.demo, self.scenario_started = None, None
+            self.log("simulation", "Scripted simulation off.")
+            return False
+        if self.simulator is None:
+            sim = SimulatedCSIProducer(bpm=14.0, distance_m=2.0, seed=int(time.time()))
+            processor = CSIProcessor(
+                ProcessorConfig(),
+                calibration_path=str(BACKEND_DIR / "calibration.simulated.json"),
+                simulated_distance_m=2.0,
+            )
+            for frame in await asyncio.to_thread(sim.prime, processor.config.window_seconds):
+                processor.add_frame(frame)
+            self.demo = (sim, processor)
+        self.scenario_started = time.monotonic()
+        self.log("simulation", "Scripted simulation on.")
+        return True
+
     def configure_simulation(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self.simulator is None:
             raise ValueError("Simulation controls are available only with --simulate")
@@ -305,6 +338,8 @@ class RescueRuntime:
             elif kind == "calibration":
                 status = self.calibration(payload)
                 await websocket.send_json({"type": "ack", "for": "calibration", "ok": True, "calibration": status})
+            elif kind == "demo":
+                await websocket.send_json({"type": "ack", "for": "demo", "ok": True, "active": await self.toggle_demo()})
             elif kind == "simulate":
                 await websocket.send_json({"type": "ack", "for": "simulate", "ok": True, "simulation": self.configure_simulation(payload)})
             elif kind == "ping":

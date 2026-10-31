@@ -13,8 +13,8 @@ second the newest 30 s are analysed:
 3.  Every subcarrier is whitened by its own noise level (MAD of first
     differences), so quiet, informative subcarriers count as much as noisy
     ones in the combination.
-4.  Gross body movement is detected from 0.8-4 Hz energy.  Breathing is only
-    estimated from the data after the last movement.
+4.  Every packet in the window is used.  Bursts are clipped per subcarrier;
+    0.8-4 Hz energy is reported as a feature only and blocks nothing.
 5.  The band-passed subcarriers are combined with PCA; of the first few
     components, the most *periodic* one is kept (not the most energetic).
 6.  Three scores describe it, each 0..1 and shown on the dashboard:
@@ -23,7 +23,7 @@ second the newest 30 s are analysed:
       strength - band power above the noise / empty-room reference
     Confidence is their weighted geometric mean, so all three must agree.
 7.  A hysteresis state machine turns confidence into
-    no_signal / warming_up / empty / breathing / motion, and BPM is the
+    no_signal / warming_up / empty / breathing, and BPM is the
     median of recent confident estimates.
 """
 
@@ -76,8 +76,7 @@ class ProcessorConfig:
     filter_high_hz: float = 0.70
     motion_low_hz: float = 0.8
     motion_high_hz: float = 4.0
-    motion_threshold: float = 2.5  # x noise-only energy in the motion band
-    motion_settle_seconds: float = 2.0
+    shift_window_seconds: float = 15.0  # longer than the slowest rhythm (10 s)
     pca_candidates: int = 3
     drop_first_word: bool = True
     # Score ramps.  An empty-room calibration raises the floors to the
@@ -307,7 +306,7 @@ class CalibrationManager:
         if len(samples) < 3:
             self.last_result = {
                 "ok": False,
-                "message": "Not enough clean signal captured (movement or no CSI). Keep still and retry.",
+                "message": "Not enough signal captured (no CSI). Check the board and retry.",
             }
         elif active["kind"] == "empty":
             self.baseline = Baseline.from_samples(samples)
@@ -512,24 +511,11 @@ class CSIProcessor:
         motion_trace = _band_energy(whitened, fs, cfg.motion_low_hz, cfg.motion_high_hz)
         recent = max(1, int(round(2.0 * fs)))
         motion_index = float(np.mean(motion_trace[-recent:]))
-        moving = np.flatnonzero(motion_trace > cfg.motion_threshold)
         heatmap = _heatmap(whitened, fs, cfg)
         common = {"link": link, "heatmap": heatmap, "motion_index": round(motion_index, 2)}
-        if motion_index > cfg.motion_threshold:
-            return self._motion_result("Large movement in the sensing area. Breathing cannot be measured while it lasts.", common, motion_index)
-        analysis_start = 0
-        if moving.size:
-            analysis_start = int(moving[-1] + cfg.motion_settle_seconds * fs)
-        usable_seconds = (whitened.shape[0] - analysis_start) / fs
-        if usable_seconds < cfg.min_window_seconds:
-            return self._motion_result(
-                f"Settling after movement: {max(0.0, usable_seconds):.0f} of {cfg.min_window_seconds:.0f} s of still signal.",
-                common,
-                motion_index,
-                progress=max(0.0, usable_seconds) / cfg.min_window_seconds,
-            )
-        still = whitened[analysis_start:]
-        still_grid = grid[analysis_start:]
+        # Every packet in the window is used. Disturbances are limited, not excluded.
+        still = _limit_spikes(_remove_shifts(whitened, int(cfg.shift_window_seconds * fs)))
+        still_grid = grid
 
         # --- breathing -------------------------------------------------------
         filtered = _bandpass(still, fs, cfg.filter_low_hz, cfg.filter_high_hz)
@@ -547,7 +533,10 @@ class CSIProcessor:
                 candidates.append(metrics)
         if not candidates:
             return self._idle("no_signal", "Window too short for breathing analysis.", link)
-        best = max(candidates, key=lambda item: item["quality"])
+        # A "peak" on the band edge is leakage from something slower, not a rhythm.
+        edge_bpm = cfg.breathing_low_hz * 60.0 + 0.5
+        clear = [item for item in candidates if item["bpm"] > edge_bpm]
+        best = max(clear or candidates, key=lambda item: item["quality"])
         loading = best["loading"]
         component = best["filtered"]
         if self._prev_loading is not None and self._prev_loading.shape == loading.shape and float(np.dot(loading, self._prev_loading)) < 0:
@@ -556,6 +545,8 @@ class CSIProcessor:
         self._prev_loading = loading
 
         scores, confidence = self._score(best)
+        if not clear:
+            confidence = 0.0
         model_probability = self._model_probability(best, motion_index)
         if model_probability is not None:
             confidence = 0.5 * confidence + 0.5 * model_probability
@@ -715,16 +706,6 @@ class CSIProcessor:
         if state != self._state:
             self._state = state
             self._state_since = time.time()
-
-    def _motion_result(self, detail: str, common: dict[str, Any], motion_index: float, progress: float | None = None) -> dict[str, Any]:
-        self._above = 0
-        self._below = 0
-        self._bpm_estimates.clear()
-        self._set_state("motion")
-        self._push_history("motion", 0.0, None)
-        result = self._blank("motion", detail, common["link"], progress)
-        result.update({"heatmap": common["heatmap"], "motion_index": round(motion_index, 2), "history": list(self._history)})
-        return result
 
     def _idle(self, state: str, detail: str, link: dict[str, Any], progress: float | None = None) -> dict[str, Any]:
         if state in {"no_signal", "warming_up"}:
@@ -932,6 +913,30 @@ def _band_energy(whitened: np.ndarray, fs: float, low: float, high: float) -> np
     energy = np.mean(banded**2, axis=1) / expected
     # A median over 1.5 s ignores sub-second glitches; real movement lasts.
     return ndimage.median_filter(energy, size=max(3, int(1.5 * fs) | 1), mode="nearest")
+
+
+def _remove_shifts(values: np.ndarray, window: int) -> np.ndarray:
+    """Subtract a running median: a level shift left by a disturbance would
+    otherwise look like a very slow rhythm.
+
+    The median is taken every 5th bin and interpolated, which is several times
+    faster on the Pi and loses nothing at this time scale.
+    """
+
+    step = 5
+    coarse = ndimage.median_filter(values[::step], size=(max(3, window // step) | 1, 1), mode="nearest")
+    position = np.arange(values.shape[0]) / step
+    lower = position.astype(int)
+    upper = np.minimum(lower + 1, coarse.shape[0] - 1)
+    fraction = (position - lower)[:, None]
+    return values - (coarse[lower] * (1.0 - fraction) + coarse[upper] * fraction)
+
+
+def _limit_spikes(values: np.ndarray, limit: float = 4.0) -> np.ndarray:
+    """Clip each subcarrier to `limit` robust deviations so bursts cannot dominate."""
+
+    spread = 1.4826 * np.median(np.abs(values), axis=0) + 1.0e-9
+    return np.clip(values, -limit * spread, limit * spread)
 
 
 def _autocorrelation_period(x: np.ndarray, fs: float, low_hz: float, high_hz: float) -> tuple[float, float | None]:

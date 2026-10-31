@@ -71,6 +71,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if not 1.0 <= args.duration <= 3600.0 or not 0.1 <= args.max_mb <= 500.0:
+        raise SystemExit("Limits: --duration 1 to 3600 seconds, --max-mb 0.1 to 500.")
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", args.label)[:40]
     path = Path(args.out_dir) / f"{time.strftime('%Y%m%d-%H%M%S')}_{safe}{'_SIMULATED' if args.simulate else ''}.jsonl"
     meta = {"label": args.label, "distance_m": args.distance_m, "channel": args.channel, "notes": args.notes,

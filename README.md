@@ -45,7 +45,7 @@ Record labelled raw trials for experiments with `python capture_raw.py --label e
 | --- | --- |
 | CSI DSP, calibration, dashboard | Working (inherited), wording updated to observations |
 | ESP32 firmware v3.1 | Flashed and streaming to the Pi over native USB (unstable 5-70 pkt/s via laptop hotspot, target 100) |
-| Backend JATAYU layer + REST/WS API | Running on the Pi with live CSI; 47 tests (simulation plus the real serial read loops) |
+| Backend JATAYU layer + REST/WS API | Running on the Pi with live CSI; 71 tests (simulation, real serial read loops, hard limits) |
 | Arduino Mega firmware | Not written |
 | Multi-node ingestion, localisation, 3D view | Not started (research goals) |
 

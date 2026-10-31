@@ -13,30 +13,38 @@ Update it whenever the setup or a result changes. Last updated 2026-10-31.
 | Arduino Mega | Firmware not written; backend runs with `--arduino-port none` |
 | Second Pi | Not used by any code |
 
-## Two dashboards
+## Dashboard
 
 | Address | Data source | Started by |
 | --- | --- | --- |
-| `http://192.168.137.10:8000` | **Real** CSI from the ESP32 | `jatayu.service` |
-| `http://192.168.137.10:8001` | **Simulated**: no sensor is read | `.venv/bin/python app.py --simulate --host 0.0.0.0 --port 8001` in `~/JATAYU/backend` |
+| `http://192.168.137.10:8000` | **Real** CSI from the ESP32, or **simulated** after pressing `7` | `jatayu.service` |
 
 ## Simulation
 
-The dashboard on port 8001 looks the same as the real one and does not carry a simulation label, by
-project decision. **Everything it shows is generated, including the rhythm, distance, gas readings and
-keypad events.** It is not a measurement and is not evidence the system detects anything.
+**Press `7` on the dashboard to switch to simulated data; press `7` again to return to real data.** There is
+no simulation label on screen, by project decision. **Everything shown after pressing `7` is generated.** It is
+not a measurement and is not evidence the system detects anything.
 
 - Generator: `SimulatedCSIProducer` in `backend/serial_io.py` and `SimulatedArduino` in `backend/jatayu/arduino_io.py`. Default: 15 cycles/min at 2.5 m.
-- Scenario controls: add `#controls` to the address, e.g. `http://192.168.137.10:8001/#controls`.
-- Records stay marked: `/health` and `/telemetry` report `"source": "simulation"`, stored rows use `simulated`, and data goes to the separate `jatayu.simulated.db` and `calibration.simulated.json`.
+- **Script:** the rate shown goes from 14 to 19 over 8 s, back to 14 over 8 s, wavers around 14 for 8 s, then holds at 14. This is a script, not an analysis result.
+- Hardware-free mode: `.venv/bin/python app.py --simulate`, with scenario controls at `/#controls`.
+- Records stay separate: `/telemetry` reports `"source": "simulation"`, and readings made after pressing `7` are never stored as observations. The ESP32 keeps being read in the background.
 - The header says `Connected` in simulation and `Live` only for a real stream.
-- **Tell anyone watching a demo that this view is simulated**, and do not quote its numbers as measured results.
+- **Tell anyone watching a demo when this view is simulated**, and do not quote its numbers as measured results.
 
 ## Results so far
 
-Simulated (`tests/evaluate_pipeline.py`), before and after the noise-estimate fix: detection 97.3% -> 99.8%,
-false alarms 1.0% -> 1.0%, median rate error 0.00 cycles/min. These describe the code against its own
-simulator, not real-world accuracy.
+Simulated (`tests/evaluate_pipeline.py`), original code -> noise-estimate fix -> longest still stretch:
+detection 97.3% -> 99.8% -> 100.0%, false alarms 1.0% throughout, median rate error 0.00 cycles/min.
+These describe the code against its own simulator, not real-world accuracy.
+
+Movement blocking was later removed altogether. Stress test caveat: when the simulator was repeatedly disturbed, false patterns appeared in an empty scene, so a reading during movement is not reliable.
+
+Before that, replaying one 90 s recording from the crowded room, seconds reading "Movement": 36 of 60 with the noise
+fix alone, 27 of 60 with the longest still stretch as well. Movement that is still happening is still reported.
+
+RescueSense_VisionX has the same signal processing and firmware CSI settings, and no recorded real-world
+calibration, so it offers no better movement handling to copy.
 
 Real hardware, in a room of about 150 people:
 
@@ -44,9 +52,41 @@ Real hardware, in a room of about 150 people:
 | --- | --- |
 | Packet rate | About 30-50 pkt/s and uneven (target 100, backend minimum 20) |
 | Packet loss over USB | About 0.1% |
-| Dashboard state | Mostly "Movement detected", likely correct with that many people moving |
+| Dashboard state | "No clear pattern" on the crowded-room recording. Movement no longer blocks analysis: every packet is used, level shifts are removed and bursts clipped |
 | Periodic pattern detection | **Not measured** |
 | Empty-room baseline | **Not recorded**; built-in default thresholds in use |
+
+## First real recordings
+
+One trial, own room with other people nearby. **No breathing rhythm was found in either recording, so this does not show detection.**
+
+| Recording | Length | Packets/s | Rhythm | Confidence | Estimates (cycles/min) |
+| --- | --- | --- | --- | --- | --- |
+| Person in the link | 184 s | 45 | 0.02 | 0 | 7.0-29.9, median 18.2 |
+| Person out of the link | 110 s (SSH dropped) | 48 | 0.00 | 0 | 6.6-23.0, median 12.3 |
+
+The estimates are too scattered to report as rates. No hand count was recorded.
+
+## Hard limits
+
+- Serial rows: at most 2000 characters and 128 subcarriers, amplitude 0-10000, RSSI -127 to 0 dBm, channel 1-14. Other rows are counted as dropped.
+- Outputs: rate within 6-30 cycles/min; confidence and scores within 0-1.
+- Tools: recordings 1-3600 s and 0.1-500 MB; analysis under 500 ms in the time-budget test.
+
+
+## Recording real breathing
+
+Stop the backend, record, restart it (only one program can use the serial port):
+
+```bash
+sudo systemctl stop jatayu
+cd ~/JATAYU/backend && .venv/bin/python capture_raw.py --label breathing --duration 180 --distance-m 2
+sudo systemctl start jatayu
+.venv/bin/python analyze_recording.py recordings/<file>.jsonl --breaths <hand count>
+```
+
+Compare against an `--label empty` recording of the same length, without `--breaths`. A result counts only
+if the error is within 2 cycles/min and the empty recording does not show the same rhythm.
 
 ## Measuring properly
 

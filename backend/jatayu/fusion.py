@@ -31,8 +31,8 @@ RF_TEXT = {
 
 @dataclass
 class RfConfig:
-    min_packet_rate_hz: float = 20.0
-    good_packet_rate_hz: float = 50.0
+    min_packet_rate_hz: float = 5.0
+    good_packet_rate_hz: float = 30.0
     stale_after_s: float = 3.0
     max_loss_ratio: float = 0.30   # above this, packet loss makes the window unusable
     fair_loss_ratio: float = 0.10

@@ -373,7 +373,6 @@
         <div class="legend">
           <span><i style="background:var(--ok)"></i>Periodic pattern</span>
           <span><i style="background:var(--idle)"></i>Clear</span>
-          <span><i style="background:var(--warn)"></i>Movement</span>
           <span><i style="background:var(--info)"></i>Warming up</span>
           <span><i style="background:var(--bad)"></i>No signal</span>
         </div>
@@ -387,7 +386,6 @@
           <div class="metric"><div class="l"><span class="dot" id="rssiDot"></span>RSSI</div><div class="v" id="mRssi">--<small>dBm</small></div></div>
           <div class="metric"><div class="l">Subcarriers used</div><div class="v" id="mCarriers">--</div></div>
           <div class="metric"><div class="l">Analysis window</div><div class="v" id="mWindow">--<small>s</small></div></div>
-          <div class="metric"><div class="l">Movement level</div><div class="v" id="mMotion">--</div></div>
           <div class="metric"><div class="l">Odd / bad packets</div><div class="v" id="mDropped">--</div></div>
         </div>
         <div class="device-line" id="deviceLog">No device messages yet.</div>
@@ -423,7 +421,7 @@
         <label class="switch"><span>Person present</span><input type="checkbox" id="simPresent" checked></label>
         <div class="field"><div class="field-top"><span>Breathing rate</span><b id="simBpmOut">15 BPM</b></div><input type="range" id="simBpm" min="6" max="30" step="1" value="15"></div>
         <div class="field"><div class="field-top"><span>Distance</span><b id="simDistOut">2.5 m</b></div><input type="range" id="simDist" min="0.5" max="5" step="0.5" value="2.5"></div>
-        <button class="btn small" id="simMotion" type="button" style="width:100%">Add 4 s of movement</button>
+        <button class="btn small" id="simMotion" type="button" style="width:100%">Add 4 s of disturbance</button>
       </section>
 
       <!-- Events -->
@@ -456,13 +454,12 @@
     const STATES = {
       breathing: { chip: 'PATTERN', title: 'Periodic RF pattern observed', color: C.ok },
       empty: { chip: 'NO PATTERN', title: 'No clear periodic pattern', color: C.idle },
-      motion: { chip: 'MOVEMENT', title: 'Movement detected', color: C.warn },
       warming_up: { chip: 'WARMING UP', title: 'Collecting signal', color: C.info },
       no_signal: { chip: 'NO SIGNAL', title: 'No signal from the sensor', color: C.bad },
       offline: { chip: 'OFFLINE', title: 'Backend not reachable', color: C.bad },
       connecting: { chip: 'CONNECTING', title: 'Connecting…', color: C.info },
     };
-    const STATE_COLOR = { breathing: C.ok, empty: C.idle, motion: C.warn, warming_up: C.info, no_signal: C.bad };
+    const STATE_COLOR = { breathing: C.ok, empty: C.idle, warming_up: C.info, no_signal: C.bad };
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const pct = (v) => `${Math.round(clamp(v || 0, 0, 1) * 100)}%`;
     const store = {
@@ -566,7 +563,9 @@
       let detail = d.state_detail || '';
       if (d.state === 'no_signal' && d.source === 'serial') detail = serialHint(d.serial) || detail;
       setState(d.state, detail, d.progress);
-      $('bpmValue').textContent = d.bpm != null ? Number(d.bpm).toFixed(1) : '—';
+      // Always show the current estimate; confidence beside it says how far to trust it.
+      const shownRate = d.bpm != null ? d.bpm : d.bpm_instant;
+      $('bpmValue').textContent = shownRate != null ? Number(shownRate).toFixed(1) : '—';
       $('confidenceValue').textContent = pct(d.confidence);
       const sc = d.scores || {};
       [['Rhythm', sc.rhythm], ['Focus', sc.focus], ['Strength', sc.strength]].forEach(([name, v]) => {
@@ -614,8 +613,6 @@
       $('rssiDot').className = `dot ${rssi == null ? '' : rssi >= -60 ? 'ok' : rssi >= -75 ? 'warn' : 'bad'}`;
       $('mCarriers').textContent = link.subcarriers_used != null ? `${link.subcarriers_used} / ${link.frame_width}` : (link.frame_width ? `-- / ${link.frame_width}` : '--');
       $('mWindow').innerHTML = `${fmt(link.window_seconds, 0)}<small>s</small>`;
-      const m = Number(d.motion_index) || 0;
-      $('mMotion').textContent = d.valid || d.state === 'motion' ? `${m.toFixed(1)}× ${m > 2.5 ? 'high' : m > 1.6 ? 'some' : 'calm'}` : '--';
       $('mDropped').textContent = `${link.dropped_width || 0} odd · ${link.gain_steps_corrected || 0} steps`;
       $('sourceNote').textContent = d.serial && d.serial.port ? `${d.serial.port} @ ${d.serial.baud}` : '';
       const lines = [];
@@ -741,7 +738,11 @@
     });
     $('resetUrlBtn').addEventListener('click', () => { manualUrl = null; store.set('rs.ws', null); $('wsUrl').value = defaultUrl(); connect(); });
     $('wsUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('connectBtn').click(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('settings').hidden = true; });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') $('settings').hidden = true;
+      // Toggle the scripted simulation (docs/system-guide.md).
+      if (e.key === '7' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) send({ type: 'demo' });
+    });
 
     let toastTimer = null;
     function toast(text, bad = false) {
@@ -764,7 +765,8 @@
         detail.textContent = 'A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.';
         return;
       }
-      rate.textContent = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : '--';
+      const shownRate = data.bpm != null ? data.bpm : data.bpm_instant;
+      rate.textContent = shownRate != null ? `${Number(shownRate).toFixed(1)} BPM` : '--';
       distance.textContent = data.distance_m != null ? `${Number(data.distance_m).toFixed(1)} m` : 'uncal.';
       confidence.textContent = pct(data.confidence);
       if (data.state === 'breathing') {
@@ -772,9 +774,6 @@
         const rate = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : 'periodic component';
         const distance = data.distance_m != null ? ` · estimated ${Number(data.distance_m).toFixed(1)} m` : '';
         detail.textContent = `${rate}${distance}. The marker is schematic only; it is not evidence of a person and not a recovered image or skeleton.`;
-      } else if (data.state === 'motion') {
-        status.textContent = 'Motion filtered';
-        detail.textContent = 'Movement is present, so the pattern marker is withheld until the signal settles.';
       } else {
         status.textContent = data.state === 'warming_up' ? 'Analysing CSI' : 'No target';
         detail.textContent = 'No qualified periodic RF pattern is currently available, so no marker is shown.';
@@ -974,7 +973,6 @@
       const d = view.data;
       if (!d || !d.waveform || !d.waveform.length) {
         const why = !view.connected ? 'Backend offline'
-          : d && d.state === 'motion' ? 'Paused while the area settles after movement'
           : d && d.state === 'warming_up' ? 'Filling the first analysis window…'
           : d && d.state === 'no_signal' ? 'No CSI packets' : 'Waiting for a usable window…';
         label(ctx, why, w / 2, mid - 8, 'center', C.muted, 12);
@@ -1002,7 +1000,7 @@
       plot(d.waveform, view.breathing ? C.ok : C.idle, 2, true);
       if (d.waveform.length && d.waveform[0][0] > -span + 1) {
         const x0 = xOf(d.waveform[0][0]);
-        if (x0 > L + 40) label(ctx, 'excluded (movement / warm-up)', (L + x0) / 2, mid - 10, 'center', C.muted, 11);
+        if (x0 > L + 40) label(ctx, 'warming up', (L + x0) / 2, mid - 10, 'center', C.muted, 11);
       }
     }
 
@@ -1081,7 +1079,7 @@
       label(ctx, 'breaths / min', w / 2, h - 4, 'center', C.muted, 10.5);
       const d = view.data;
       if (!d || !d.spectrum || !d.spectrum.length) {
-        label(ctx, d && d.state === 'motion' ? 'Paused during movement' : 'No spectrum yet', w / 2, T + ph / 2, 'center', C.muted, 12);
+        label(ctx, 'No spectrum yet', w / 2, T + ph / 2, 'center', C.muted, 12);
         return;
       }
       const col = view.breathing ? C.ok : C.brand;

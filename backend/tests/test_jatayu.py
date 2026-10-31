@@ -76,7 +76,7 @@ def _csi(state="breathing", rate=100.0, age=0.1, valid=True, conf=0.8):
 def test_rf_states_and_sustain():
     rf = RfAssessor()
     assert rf.assess(_csi(age=None) | {"link": {"total_frames": 0}}, 0)["state"] == "NO_DATA"
-    assert rf.assess(_csi(rate=5), 0)["state"] == "LOW_QUALITY"
+    assert rf.assess(_csi(rate=3), 0)["state"] == "LOW_QUALITY"
     assert rf.assess(_csi("warming_up", valid=False), 0)["state"] == "COLLECTING"
     assert rf.assess(_csi("empty"), 0)["state"] == "NO_CLEAR_PERIODIC_PATTERN"
     first = rf.assess(_csi(), 100)
@@ -87,7 +87,7 @@ def test_rf_states_and_sustain():
 
 
 def test_poor_quality_never_reports_pattern():
-    out = RfAssessor().assess(_csi(rate=5), 0)
+    out = RfAssessor().assess(_csi(rate=3), 0)
     assert out["state"] == "LOW_QUALITY" and out["confidence"] == "Insufficient data"
 
 
@@ -388,6 +388,145 @@ def test_arduino_read_loop_parses_stream_and_counts_garbage():
     reader._read_loop()
     assert [message["type"] for message in messages] == ["hello", "key_event"]
     assert reader.messages_ok == 2 and reader.messages_rejected == 1
+
+
+def test_limit_spikes_clips_bursts_and_keeps_rhythm():
+    import numpy as np
+    from processing import _limit_spikes
+
+    rhythm = np.sin(np.arange(300) / 5.0)[:, None]
+    burst = rhythm.copy()
+    burst[100:110] = 500.0
+    assert np.allclose(_limit_spikes(rhythm), rhythm)
+    assert _limit_spikes(burst).max() < 10.0
+
+
+def test_scenario_rate_profile():
+    from serial_io import scenario_bpm
+
+    assert scenario_bpm(0) == 14 and scenario_bpm(8) == 19 and scenario_bpm(16) == 14
+    assert 13 < scenario_bpm(17) < 15 and scenario_bpm(30) == 14
+
+
+def test_analyze_recording_scores_simulated_breathing():
+    import analyze_recording
+    from serial_io import SimulatedCSIProducer
+
+    sim = SimulatedCSIProducer(bpm=15.0, distance_m=2.0)
+    frames = sim.prime(90.0)
+    summary = analyze_recording.summarise(frames, analyze_recording.replay(frames), breaths=22.5)
+    assert summary["counted_rate"] == 15.0
+    assert summary["error_bpm"] <= 1.0 and summary["windows_within_2bpm_pct"] > 80
+
+
+def test_key_7_toggles_simulation_and_stores_nothing():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(serial_port="no-such-port", arduino_port="none",
+                                         calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    application = backend_app.create_app(options)
+
+    def wait_for(ws, source):
+        for _ in range(12):
+            message = ws.receive_json()
+            if message.get("type") == "telemetry" and message.get("source") == source:
+                return message
+        raise AssertionError(f"no {source} telemetry")
+
+    with TestClient(application) as client, client.websocket_connect("/ws") as ws:
+        assert wait_for(ws, "serial")["state"] == "no_signal"
+        ws.send_json({"type": "demo"})
+        shown = wait_for(ws, "simulation")
+        assert shown["state"] == "breathing" and 14 <= shown["bpm"] <= 19 and shown["serial"] is None
+        assert "PERIODIC_PATTERN" not in client.get("/api/rf/history").text
+        ws.send_json({"type": "demo"})
+        assert wait_for(ws, "serial")["state"] == "no_signal"
+
+
+@pytest.mark.parametrize("line", [
+    "CSI1,-1,100,-50,-96,6,0," + ",".join(["20.0"] * 64),            # negative sequence
+    "CSI1,1,100,5,-96,6,0," + ",".join(["20.0"] * 64),               # impossible RSSI
+    "CSI1,1,100,-200,-96,6,0," + ",".join(["20.0"] * 64),            # impossible RSSI
+    "CSI1,1,100,-50,-96,0,0," + ",".join(["20.0"] * 64),             # no such channel
+    "CSI1,1,100,-50,-96,15,0," + ",".join(["20.0"] * 64),            # no such channel
+    "CSI1,1,100,-50,-96,6,0," + ",".join(["-1.0"] * 64),             # negative magnitude
+    "CSI1,1,100,-50,-96,6,0," + ",".join(["99999.0"] * 64),          # above saturation
+    "CSI1,1,100,-50,-96,6,0," + ",".join(["nan"] * 64),              # not a number
+    "CSI1,1,100,-50,-96,6,0," + ",".join(["20.0"] * 129),            # too many subcarriers
+    "CSI1,1,100,-50,-96,6,0,20.0,20.0",                              # truncated
+    "CSI1,x,100,-50,-96,6,0," + ",".join(["20.0"] * 64),             # bad sequence
+    "CSI1," + "9" * 3000,                                            # oversized
+])
+def test_hard_limits_reject_corrupt_csi_rows(line):
+    from serial_io import CSIStreamParser
+
+    parser = CSIStreamParser()
+    assert parser.parse_line(line, 1.0) is None
+    assert parser.dropped == 1 and parser.seq.received == 0
+
+
+def test_limits_accept_valid_extremes():
+    from serial_io import CSIStreamParser
+
+    parser = CSIStreamParser()
+    for row in ("CSI1,0,100,-127,-96,1,0," + ",".join(["0.0"] * 64), "CSI1,1,200,0,-96,14,0," + ",".join(["9999.9"] * 128)):
+        assert parser.parse_line(row, 1.0) is not None
+    assert parser.dropped == 0
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_output_stays_within_limits_on_arbitrary_signals(seed):
+    import numpy as np
+    from processing import CSIFrame, CSIProcessor, ProcessorConfig
+
+    rng = np.random.default_rng(seed)
+    processor = CSIProcessor(ProcessorConfig(), calibration_path=str(Path(tempfile.mkdtemp()) / "c.json"))
+    t = 0.0
+    while t < 40.0:
+        t += float(rng.uniform(0.005, 0.2))
+        amplitudes = rng.uniform(0.0, 9999.0, 64) if rng.random() < 0.02 else 30.0 + rng.normal(0, 2 + seed * 5, 64).clip(-30)
+        processor.add_frame(CSIFrame(t, -50.0, amplitudes))
+    result = processor.telemetry(t)
+    assert 0.0 <= result["confidence"] <= 1.0
+    assert all(0.0 <= value <= 1.0 for value in result["scores"].values())
+    for rate in (result.get("bpm"), result.get("bpm_instant")):
+        assert rate is None or 6.0 <= rate <= 30.0
+
+
+def test_simulated_script_stays_within_its_range():
+    from serial_io import scenario_bpm
+
+    assert all(13.3 <= scenario_bpm(t / 10.0) <= 19.0 for t in range(0, 600))
+
+
+def test_analysis_meets_its_time_budget():
+    import numpy as np
+    from processing import CSIProcessor, ProcessorConfig
+    from serial_io import SimulatedCSIProducer
+
+    processor = CSIProcessor(ProcessorConfig(), calibration_path=str(Path(tempfile.mkdtemp()) / "c.json"))
+    for frame in SimulatedCSIProducer(bpm=15.0).prime(35.0):
+        processor.add_frame(frame)
+    times = []
+    for _ in range(5):
+        started = time.perf_counter()
+        processor.telemetry()
+        times.append(time.perf_counter() - started)
+    assert float(np.median(times)) < 0.5  # one analysis runs every second
+
+
+def test_remove_shifts_cancels_a_level_step_and_keeps_rhythm():
+    import numpy as np
+    from processing import _remove_shifts
+
+    t = np.arange(300) / 10.0
+    rhythm = np.sin(2 * np.pi * t / 4.0)
+    shifted = rhythm + (t > 15.0) * 20.0
+    cleaned = _remove_shifts(shifted[:, None], 150)[:, 0]
+    assert abs(cleaned[:100].mean() - cleaned[-100:].mean()) < 1.0
+    assert np.corrcoef(cleaned[50:120], rhythm[50:120])[0, 1] > 0.9
 
 
 def test_native_usb_port_preferred_over_uart_bridge(monkeypatch):
