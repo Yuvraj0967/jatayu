@@ -417,13 +417,13 @@
         <div class="cal-status" id="calStatus">Not recording. Re-run after moving the router, the ESP32, or the wall.</div>
       </section>
 
-      <!-- Simulation controls (only with --simulate) -->
+      <!-- Scenario controls: only with --simulate and #controls in the URL (docs/system-guide.md) -->
       <section class="card span-3" id="simCard" hidden aria-labelledby="simTitle">
-        <div class="card-head"><h2 class="card-title" id="simTitle">Simulation</h2><span class="sim-badge">not real data</span></div>
+        <div class="card-head"><h2 class="card-title" id="simTitle">Scenario</h2></div>
         <label class="switch"><span>Person present</span><input type="checkbox" id="simPresent" checked></label>
         <div class="field"><div class="field-top"><span>Breathing rate</span><b id="simBpmOut">15 BPM</b></div><input type="range" id="simBpm" min="6" max="30" step="1" value="15"></div>
         <div class="field"><div class="field-top"><span>Distance</span><b id="simDistOut">2.5 m</b></div><input type="range" id="simDist" min="0.5" max="5" step="0.5" value="2.5"></div>
-        <button class="btn small" id="simMotion" type="button" style="width:100%">Simulate 4 s of movement</button>
+        <button class="btn small" id="simMotion" type="button" style="width:100%">Add 4 s of movement</button>
       </section>
 
       <!-- Events -->
@@ -554,7 +554,7 @@
 
       // Link pill
       const link = d.link || {};
-      if (d.source === 'simulation') setLink('warn', `Simulation · ${fmt(link.packet_rate_hz, 0)} pkt/s · not real data`);
+      if (d.source === 'simulation') setLink('ok', `Connected · ${fmt(link.packet_rate_hz, 0)} pkt/s`);
       else {
         const s = d.serial || {};
         if (s.state === 'streaming') setLink('ok', `Live · ${s.port} · ${fmt(s.packet_rate_hz, 0)} pkt/s`);
@@ -586,7 +586,7 @@
       // Proximity note
       const cal = d.calibration || {};
       $('radarNote').textContent = d.distance_m != null
-        ? `${Number(d.distance_m).toFixed(1)} m ± ${Number(d.distance_uncertainty_m).toFixed(1)}${d.distance_source === 'simulated' ? ' · simulated' : ''}`
+        ? `${Number(d.distance_m).toFixed(1)} m ± ${Number(d.distance_uncertainty_m).toFixed(1)}`
         : (cal.mapping_ready ? 'waiting for a detection' : 'needs calibration');
 
       renderHealth(d); renderCalibration(cal); renderSimulation(d); renderEvents(d.events || []);
@@ -600,7 +600,7 @@
       if (wifi && wifi.state === 'disconnected') return `ESP32 cannot join Wi-Fi: ${wifi.reason_text || 'unknown reason'}. Check the SSID/password in firmware/sdkconfig.wifi and that the hotspot is 2.4 GHz.`;
       if (wifi && wifi.state === 'connecting') return `ESP32 is connecting to "${wifi.ssid || 'Wi-Fi'}"…`;
       if (s.state === 'searching' || s.state === 'error' || s.state === 'reconnecting') return s.error;
-      if (s.state === 'open') return `${s.port} is open but no CSI rows are arriving. Is the JATAYU firmware flashed, and is idf.py monitor closed?`;
+      if (s.state === 'open') return `${s.port} is open but no CSI rows are arriving. Is the JATAYU firmware flashed, is idf.py monitor closed, and is the cable in the ESP32 USB socket the firmware prints on (try the other one)?`;
       return null;
     }
 
@@ -617,7 +617,7 @@
       const m = Number(d.motion_index) || 0;
       $('mMotion').textContent = d.valid || d.state === 'motion' ? `${m.toFixed(1)}× ${m > 2.5 ? 'high' : m > 1.6 ? 'some' : 'calm'}` : '--';
       $('mDropped').textContent = `${link.dropped_width || 0} odd · ${link.gain_steps_corrected || 0} steps`;
-      $('sourceNote').textContent = d.source === 'simulation' ? 'simulated source' : (d.serial && d.serial.port ? `${d.serial.port} @ ${d.serial.baud}` : 'serial');
+      $('sourceNote').textContent = d.serial && d.serial.port ? `${d.serial.port} @ ${d.serial.baud}` : '';
       const lines = [];
       if (d.serial) {
         const dev = d.serial.device || {};
@@ -625,8 +625,6 @@
         if (dev.wifi) lines.push(`wifi: ${dev.wifi.state}${dev.wifi.ip ? ' ' + dev.wifi.ip : ''}${dev.wifi.channel ? ' ch' + dev.wifi.channel : ''}${dev.wifi.reason_text ? ' (' + dev.wifi.reason_text + ')' : ''}`);
         if (dev.stats) lines.push(`device: ${dev.stats.pps || '?'} pkt/s sent · ${dev.stats.dropped || 0} queue drops · agc ${dev.stats.agc || '?'}`);
         (d.serial.messages || []).slice(-6).forEach((m) => lines.push(m.text));
-      } else if (d.simulation) {
-        lines.push(`simulated person: ${d.simulation.present ? 'present' : 'absent'} · ${d.simulation.bpm} BPM · ${d.simulation.distance_m} m`);
       }
       $('deviceLog').textContent = lines.length ? lines.join('\n') : 'No device messages yet.';
     }
@@ -680,7 +678,7 @@
     // ----------------------------------------------------------- simulation
     let simSynced = false;
     function renderSimulation(d) {
-      const sim = d.simulation;
+      const sim = location.hash === '#controls' ? d.simulation : null;
       $('simCard').hidden = !sim;
       $('eventsCard').className = `card ${sim ? 'span-3' : 'span-6'}`;
       if (!sim || simSynced) return;
@@ -699,7 +697,8 @@
     // --------------------------------------------------------------- events
     const EVENT_COLOR = { state: C.brand, alert: '#ff4d61', calibration: C.ok, error: C.bad, source: C.info, simulation: C.warn, model: C.info };
     let lastEventsKey = '';
-    function renderEvents(events) {
+    function renderEvents(allEvents) {
+      const events = allEvents.filter((ev) => ev.kind !== 'simulation');
       const key = events.length ? `${events.length}:${events[events.length - 1].t}` : '';
       if (key === lastEventsKey) return;
       lastEventsKey = key;
@@ -723,7 +722,6 @@
       $('alertBtn').classList.toggle('on', view.alert);
       $('alertLabel').textContent = view.alert ? 'Clear alert' : 'Raise alert';
       $('alertBtn').title = 'Software alert: logged and shown on the dashboard. This build has no buzzer.';
-      const simulated = view.data && view.data.source === 'simulation';
       $('alertBannerText').textContent = `Operator alert active. ${
         'Software alert only: logged for the operator. This build has no buzzer.'}`;
     }
@@ -766,20 +764,19 @@
         detail.textContent = 'A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.';
         return;
       }
-      const simulated = data.source === 'simulation' ? 'Simulation · ' : '';
       rate.textContent = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : '--';
       distance.textContent = data.distance_m != null ? `${Number(data.distance_m).toFixed(1)} m` : 'uncal.';
       confidence.textContent = pct(data.confidence);
       if (data.state === 'breathing') {
-        status.textContent = `${simulated}Periodic RF pattern`;
+        status.textContent = 'Periodic RF pattern';
         const rate = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : 'periodic component';
         const distance = data.distance_m != null ? ` · estimated ${Number(data.distance_m).toFixed(1)} m` : '';
         detail.textContent = `${rate}${distance}. The marker is schematic only; it is not evidence of a person and not a recovered image or skeleton.`;
       } else if (data.state === 'motion') {
-        status.textContent = `${simulated}Motion filtered`;
+        status.textContent = 'Motion filtered';
         detail.textContent = 'Movement is present, so the pattern marker is withheld until the signal settles.';
       } else {
-        status.textContent = `${simulated}${data.state === 'warming_up' ? 'Analysing CSI' : 'No target'}`;
+        status.textContent = data.state === 'warming_up' ? 'Analysing CSI' : 'No target';
         detail.textContent = 'No qualified periodic RF pattern is currently available, so no marker is shown.';
       }
     }

@@ -17,7 +17,7 @@ Built on the RescueSense CSI pipeline; the DSP and acquisition firmware were ext
 | `backend/` | CSI DSP + JATAYU layer (Arduino link, SQLite, fusion, incidents, REST/WebSocket) |
 | `dashboard/` | Operator console (single page, no build step) |
 | `tools/` | PowerShell setup/build/flash/run scripts (Windows) |
-| `docs/` | [architecture](docs/architecture.md), [ESP32 node](docs/esp32-node.md), [hardware](docs/hardware.md), [firmware setup](docs/firmware-setup.md), [calibration](docs/calibration.md), [demo](docs/demo-script.md), [failure modes](docs/failure-modes.md) |
+| `docs/` | [system guide](docs/system-guide.md) (current setup, real vs simulated, results), [architecture](docs/architecture.md), [ESP32 node](docs/esp32-node.md), [hardware](docs/hardware.md), [firmware setup](docs/firmware-setup.md), [calibration](docs/calibration.md), [demo](docs/demo-script.md), [failure modes](docs/failure-modes.md) |
 
 ## Quick start (no hardware)
 
@@ -44,8 +44,8 @@ Record labelled raw trials for experiments with `python capture_raw.py --label e
 | Area | State |
 | --- | --- |
 | CSI DSP, calibration, dashboard | Working (inherited), wording updated to observations |
-| ESP32 firmware v3.1 | Written, syntax-checked against stubs, **not yet built or flashed** |
-| Backend JATAYU layer + REST/WS API | Implemented and tested (44 tests, simulation) |
+| ESP32 firmware v3.1 | Flashed and streaming to the Pi over native USB (unstable 5-70 pkt/s via laptop hotspot, target 100) |
+| Backend JATAYU layer + REST/WS API | Running on the Pi with live CSI; 47 tests (simulation plus the real serial read loops) |
 | Arduino Mega firmware | Not written |
 | Multi-node ingestion, localisation, 3D view | Not started (research goals) |
 

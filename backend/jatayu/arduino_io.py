@@ -161,7 +161,7 @@ class ArduinoReader:
             for raw in lines:
                 self.handle_line(raw)
 
-    def handle_line(self, raw: bytes | str) -> None:
+    def handle_line(self, raw: bytes | bytearray | str) -> None:
         """Validate one line; split out so it is unit-testable without a port."""
 
         if not raw.strip():
@@ -170,7 +170,7 @@ class ArduinoReader:
             message = protocol.parse_line(raw)
         except protocol.ProtocolError as exc:
             self.messages_rejected += 1
-            text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+            text = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else raw
             self.last_error_line = f"{exc}: {text[:80]}"
             return
         self.messages_ok += 1

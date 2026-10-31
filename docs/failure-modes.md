@@ -23,4 +23,6 @@
 5. If sample rate remains poor, flash/switch to the official two-ESP32 sender path.
 6. If RF is still poor, use simulated telemetry only with an explicit fallback label alongside any recorded live evidence; do not fabricate a live detection.
 | Sequence gaps / high packet-loss ratio | Firmware queue overflow, serial bandwidth, noisy USB cable, wrong baud | Check `#STAT` `qhw`/`dropped`; use a short data cable; keep 921600 baud; on the Pi prefer the native USB port | Window is graded LOW_QUALITY above 30% loss; never interpolate missing packets |
+| Only ROM boot lines on serial, then silence, while the board is still on Wi-Fi | Cable is in the USB socket the firmware does not print on | Move the cable at the ESP32 end to the other socket | Check `lsusb`: `303a:1001` is native USB, `1a86:55d3` is the UART bridge |
+| About 5 pkt/s with `dropped=0` | Gateway ignores the pings (e.g. Windows firewall on a laptop hotspot), so CSI comes mostly from beacons | Allow ICMP echo on the gateway; see firmware-setup.md | Ping the gateway from the Pi to confirm |
 | `#JATAYU` banner shows `reset=panic`/`watchdog`/`brownout` | Crash, stuck task, weak USB supply | Use a quality cable and a powered port; capture the serial log | Report the reset; do not trust the window straddling it |

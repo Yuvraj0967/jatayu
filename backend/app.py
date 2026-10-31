@@ -117,7 +117,7 @@ class RescueRuntime:
             for frame in self.simulator.prime(self.processor.config.window_seconds):
                 self.processor.add_frame(frame)
             self.tasks.append(asyncio.create_task(self._run_simulator(), name="simulated-csi"))
-            self.log("source", "Simulation started (no hardware is being read).")
+            self.log("simulation", "Simulation started (no hardware is being read).")
         else:
             self.reader = SerialCSIReader(self.options.serial_port, self.options.baud, on_frame=self.processor.add_frame)
             self.reader.start()

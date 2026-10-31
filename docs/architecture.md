@@ -48,7 +48,7 @@ Commands to the Mega move created -> sent -> received -> executed -> acknowledge
 
 | Phase | State |
 | --- | --- |
-| 0-1 Single node on Pi | Backend runs on Pi-class hardware; ESP32 protocol v1 written, **awaiting first real build/flash** |
+| 0-1 Single node on Pi | Backend runs on the Pi 4B with live CSI from the ESP32 (protocol v1) over USB; detection not yet evaluated |
 | 2 Environmental I/O | Pi side done (protocol, simulator, API); **Mega firmware not written** |
 | 3 Incident workflow | Done: incidents, notes, acknowledgement, event history |
 | 4 Multi-node acquisition | Groundwork: node IDs, `nodes` table with deployment metadata, `/api/nodes`. Multi-stream ingestion and time alignment not done |

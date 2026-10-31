@@ -1,0 +1,16 @@
+# Starts the JATAYU backend when the Raspberry Pi boots and restarts it if it stops.
+# Install: see docs/firmware-setup.md, "Run on the Raspberry Pi".
+# --arduino-port none until the Mega firmware exists; change it to auto after that.
+[Unit]
+Description=JATAYU backend
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/JATAYU/backend
+ExecStart=/home/pi/JATAYU/backend/.venv/bin/python app.py --host 0.0.0.0 --arduino-port none
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

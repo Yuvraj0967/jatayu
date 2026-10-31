@@ -56,7 +56,7 @@ frame (length, version, seq, checksum) before raising the rate.
 
 ## Not yet done (honest status)
 
-- Firmware compiles only under ESP-IDF; it has been syntax-checked against stub headers, **not built or flashed**. First real build = first real test.
+- Built with ESP-IDF v5.5.6 and running on the board. The current build prints on the native USB socket (`-Console usb`), so the UART socket goes silent after the ROM boot lines.
 - No on-device feature mode, and no multi-node ingestion yet (nodes can be registered with deployment metadata via `/api/nodes`).
 - Breathing-rate claims need the labelled experiments in the engineering report (milestones 3-4) with an independent reference.
 - Report suggests ESP-IDF 5.3.6; this project is pinned to v5.5.x (see `firmware-setup.md`). Record `idf.py --version` in your test log.

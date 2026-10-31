@@ -502,7 +502,10 @@ class CSIProcessor:
         binned = _hampel(binned, 7, 3.5)
         binned, gain_steps = _remove_gain_steps(binned)
         link["gain_steps_corrected"] = gain_steps
-        sigma = _noise_sigma(binned)
+        # Interpolated holes are artificially smooth; measuring noise on them
+        # understates it, which makes ordinary noise read as movement.
+        measured_bins = np.unique(np.floor((times - times[0]) * fs).astype(int))
+        sigma = _noise_sigma(binned[measured_bins])
         whitened = signal.detrend((binned - binned.mean(axis=0)) / sigma, axis=0, type="linear")
 
         # --- gross movement -------------------------------------------------

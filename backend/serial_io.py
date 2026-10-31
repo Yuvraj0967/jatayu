@@ -87,14 +87,14 @@ def list_serial_ports() -> list[dict[str, Any]]:
 def find_esp32_port() -> str | None:
     """Best guess at the ESP32 port; Bluetooth virtual ports are never chosen.
 
-    A UART bridge is preferred over the S3's native USB because the default
-    firmware console is UART0 (the connector usually labelled UART/COM).
+    The S3's native USB is preferred: only an ESP32 reports that ID, whereas a
+    UART bridge may just as well be an Arduino Mega clone (CH34x).
     """
 
     candidates = [port for port in list_serial_ports() if port["candidate"]]
     if not candidates:
         return None
-    candidates.sort(key=lambda port: (port["vid"] == f"{NATIVE_USB_VID:04X}", port["device"]))
+    candidates.sort(key=lambda port: (port["vid"] != f"{NATIVE_USB_VID:04X}", port["device"]))
     return str(candidates[0]["device"])
 
 
@@ -206,8 +206,8 @@ class CSIStreamParser:
         self.device: dict[str, Any] = {}
         self.seq = SequenceTracker()
 
-    def parse_line(self, line: str | bytes, host_now: float | None = None) -> CSIFrame | None:
-        if isinstance(line, bytes):
+    def parse_line(self, line: str | bytes | bytearray, host_now: float | None = None) -> CSIFrame | None:
+        if isinstance(line, (bytes, bytearray)):
             line = line.decode("utf-8", errors="replace")
         text = line.strip().lstrip("﻿")
         if not text:

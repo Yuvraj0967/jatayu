@@ -51,10 +51,10 @@ def _require(msg: dict[str, Any], name: str, kinds: tuple[type, ...]) -> Any:
     return value
 
 
-def parse_line(line: bytes | str) -> dict[str, Any]:
+def parse_line(line: bytes | bytearray | str) -> dict[str, Any]:
     """Decode and validate one Arduino line. Returns a normalised dict."""
 
-    if isinstance(line, bytes):
+    if isinstance(line, (bytes, bytearray)):
         if len(line) > MAX_LINE_BYTES:
             raise ProtocolError("line too long")
         try:

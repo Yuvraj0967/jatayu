@@ -344,3 +344,56 @@ def test_api_nodes_notes_and_manual_incident():
         assert client.put("/api/nodes/sim_rx_01", json={"x_m": "far"}).status_code == 400
         assert client.put("/api/nodes/bad id!", json={"x_m": 1}).status_code in (400, 404)
         assert client.put("/api/nodes/sim_rx_01", json={}).status_code == 400
+
+
+# -- real reader loops: they hand the parsers bytearrays, not bytes --------------------
+class FakeSerial:
+    def __init__(self, data, reader):
+        self.data, self.reader, self.written = data, reader, b""
+
+    @property
+    def in_waiting(self):
+        return len(self.data)
+
+    def read(self, size):
+        chunk, self.data = self.data[:size], self.data[size:]
+        if not self.data:
+            self.reader._stop.set()
+        return chunk
+
+    def write(self, payload):
+        self.written += payload
+
+    def flush(self):
+        pass
+
+
+def test_csi_read_loop_parses_stream_without_losing_the_link():
+    from serial_io import SerialCSIReader
+
+    frames = []
+    reader = SerialCSIReader("fake", on_frame=frames.append)
+    stream = "#JATAYU,proto=1,node=rx_test,fw=3.1\n#WIFI,got_ip,ip=1.2.3.4\n" + "\n".join(_csi1(s) for s in (1, 2, 3)) + "\n"
+    reader._serial = FakeSerial(stream.encode(), reader)
+    reader._read_loop()
+    assert [frame.seq for frame in frames] == [1, 2, 3]
+    assert reader.status()["node_id"] == "rx_test"
+    assert reader.parser.device["wifi"]["state"] == "got_ip"
+
+
+def test_arduino_read_loop_parses_stream_and_counts_garbage():
+    messages = []
+    reader = ArduinoReader("fake", on_message=messages.append)
+    reader._serial = FakeSerial(b'boot noise\n{"type":"hello"}\n{"type":"key_event","key":"1"}\n', reader)
+    reader._read_loop()
+    assert [message["type"] for message in messages] == ["hello", "key_event"]
+    assert reader.messages_ok == 2 and reader.messages_rejected == 1
+
+
+def test_native_usb_port_preferred_over_uart_bridge(monkeypatch):
+    import serial_io
+
+    ports = [{"device": "/dev/ttyACM0", "vid": "1A86", "candidate": True},  # could be a Mega clone
+             {"device": "/dev/ttyACM1", "vid": "303A", "candidate": True}]
+    monkeypatch.setattr(serial_io, "list_serial_ports", lambda: ports)
+    assert serial_io.find_esp32_port() == "/dev/ttyACM1"

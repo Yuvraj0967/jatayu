@@ -6,7 +6,7 @@ Update this file whenever the physical setup changes. Verify before buying anyth
 | --- | --- |
 | Raspberry Pi | **Pi 4 Model B** (8 GB per the inventory check). The earlier docs said Pi 5; nothing in the software depends on it. |
 | Pi storage | 16 GB microSD. Fine for setup; upgrade to a reputable 32/64 GB before long captures. Never store raw CSI indefinitely. |
-| ESP32-S3 dev board | Enumerates as "USB Serial Device" (native USB) on Windows in testing. Record the exact module marking, flash/PSRAM and antenna type. |
+| ESP32-S3 dev board | Two USB sockets: CH343 UART bridge (`1a86:55d3`) and native USB (`303a:1001`). The current firmware prints on native USB, so connect that socket to the Pi. Record the exact module marking, flash/PSRAM and antenna type. |
 | Arduino Mega 2560 R3 | Peripheral controller (keypad, LCD, MQ sensor). Firmware not written yet. |
 | MQ-series sensor | **Model unconfirmed.** Read the printed part number before any interpretation. Raw ADC counts only, never ppm. |
 | 16x2 LCD | **Interface unconfirmed** (I2C backpack vs 16-pin parallel). Check before wiring. |

@@ -50,7 +50,7 @@ Hotspot → **Maximize Compatibility**; on Android, choose the 2.4 GHz band.
 ```
 
 This copies `firmware\` to `C:\esp\jatayu-fw` (ESP-IDF refuses to build
-from a path with spaces, and this project lives under `HACK0WEEN 2.0`),
+from a path with spaces),
 configures the ESP32-S3 target with `sdkconfig.defaults` + your
 `sdkconfig.wifi`, builds, auto-detects the board's COM port (Bluetooth virtual
 ports are skipped), and flashes at 921600 baud.
@@ -83,6 +83,31 @@ CSI1,1,123456789,-47,-96,6,0,31.0,35.2,42.1,...
 The firmware waits for ~100 packets of AGC baseline before emitting CSI rows,
 so the first second is status-only. The backend turns the `#WIFI` reason codes
 into plain-language hints on the dashboard if the board cannot join Wi-Fi.
+
+## Run on the Raspberry Pi
+
+Plug the ESP32 into the Pi using the USB socket the firmware prints on (native
+USB for a `-Console usb` build; it shows as `303a:1001` in `lsusb`). Wi-Fi only
+captures CSI; the data reaches the Pi over this cable.
+
+With `backend/` and `dashboard/` copied to `~/JATAYU` and a `.venv` in
+`~/JATAYU/backend`, install the boot service once:
+
+```bash
+sudo install -m 644 ~/JATAYU/tools/jatayu.service /etc/systemd/system/jatayu.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now jatayu.service
+```
+
+Check it with `systemctl status jatayu` and `journalctl -u jatayu -f`. Stop it
+with `sudo systemctl stop jatayu` before reading the serial port yourself.
+
+If the gateway is a Windows Mobile Hotspot, it must answer the board's pings or
+the rate stays near 5 pkt/s. In an Administrator PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "JATAYU hotspot ping" -Direction Inbound -Protocol ICMPv4 -IcmpType 8 -LocalAddress 192.168.137.1 -RemoteAddress 192.168.137.0/24 -Action Allow
+```
 
 ## Receiver options (menuconfig → JATAYU)
 
