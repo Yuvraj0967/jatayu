@@ -207,6 +207,7 @@ class RescueRuntime:
                 self.jatayu.demo_rf = self.demo_assessor.assess(telemetry, time.time())
                 snapshot = self.jatayu.snapshot()
             else:
+                self.jatayu.demo_rf = None  # a toggle can land mid-cycle
                 snapshot = self.jatayu.tick(telemetry)
             await self.hub.broadcast(snapshot)
             telemetry["jatayu"] = snapshot
