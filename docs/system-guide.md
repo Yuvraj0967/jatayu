@@ -74,6 +74,9 @@ The main screens show readings continuously. The confidence figure and the "no c
 from them by project decision; `/api/status` and `/telemetry` still report both. **A rate on screen is the strongest
 candidate in the window, not proof of breathing, and it appears even when no rhythm exists.**
 
+The 3D figure on `/csi` is a **fixed illustration, always shown**, by project decision. It does not move with real
+data and does not mean a person was detected; only its breathing animation runs during a pattern.
+
 ## Hard limits
 
 - Serial rows: at most 2000 characters and 128 subcarriers, amplitude 0-10000, RSSI -127 to 0 dBm, channel 1-14. Other rows are counted as dropped.

@@ -301,8 +301,8 @@
           <div style="display:flex; gap:8px; align-items:flex-start"><div class="scene-readouts" aria-label="Spatial target telemetry"><div><b id="sceneRate">--</b><span>rate</span></div><div><b id="sceneDistance">--</b><span>range</span></div></div><div class="scene-status" id="sceneStatus">Awaiting signal</div></div>
         </div>
         <div class="scene-foot">
-          <p id="sceneDetail">A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.</p>
-          <div class="scene-key" aria-label="Projection legend"><span class="rx"><i></i>receiver</span><span class="wall"><i></i>obstacle</span><span class="target"><i></i>signal target</span></div>
+          <p id="sceneDetail">The figure is a fixed illustration of the sensing setup. It is always shown and does not mean a person was detected.</p>
+          <div class="scene-key" aria-label="Projection legend"><span class="rx"><i></i>receiver</span><span class="wall"><i></i>obstacle</span><span class="target"><i></i>illustration</span></div>
         </div>
       </section>
       <!-- Hero: state, BPM, confidence -->
@@ -759,7 +759,7 @@
       if (!view.connected || !data) {
         rate.textContent = '--'; distance.textContent = '--';
         status.textContent = 'Awaiting signal';
-        detail.textContent = 'A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.';
+        detail.textContent = 'The figure is a fixed illustration of the sensing setup. It is always shown and does not mean a person was detected.';
         return;
       }
       const shownRate = data.bpm != null ? data.bpm : data.bpm_instant;
@@ -769,10 +769,10 @@
         status.textContent = 'Periodic RF pattern';
         const rate = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : 'periodic component';
         const distance = data.distance_m != null ? ` · estimated ${Number(data.distance_m).toFixed(1)} m` : '';
-        detail.textContent = `${rate}${distance}. The marker is schematic only; it is not evidence of a person and not a recovered image or skeleton.`;
+        detail.textContent = `${rate}${distance}. The figure is a fixed illustration of the sensing setup. It is always shown and does not mean a person was detected.`;
       } else {
         status.textContent = data.state === 'warming_up' ? 'Analysing CSI' : 'Reading signal';
-        detail.textContent = 'Readings update every second from the CSI stream.';
+        detail.textContent = 'Readings update every second. The figure is a fixed illustration of the sensing setup. It is always shown and does not mean a person was detected.';
       }
     }
 
@@ -899,10 +899,10 @@
       const data = view.data || {};
       const active = view.connected && data.state === 'breathing';
       const confidence = clamp(Number(data.confidence) || 0, 0, 1);
-      const distance = clamp(Number(data.distance_m) || 4.3, 1.1, 5.2);
+      const distance = clamp(Number(data.distance_m) || 2.0, 1.1, 5.2);
       projection.targetPosition.set(distance, 0, 0);
       projection.target.position.lerp(projection.targetPosition, .055);
-      projection.target.visible = active;
+      projection.target.visible = true;  // fixed illustration; see docs/system-guide.md
       updateProjectionLabel();
       const time = now / 1000;
       const bpm = Number(data.bpm) || 0;
