@@ -43,6 +43,7 @@ from jatayu.store import Store
 BACKEND_DIR = Path(__file__).resolve().parent
 DASHBOARD = BACKEND_DIR.parent / "dashboard" / "console.html"  # JATAYU operator console (served at /)
 CSI_PAGE = BACKEND_DIR.parent / "dashboard" / "index.html"  # CSI view and calibration (served at /csi)
+VENDOR_FILES = {"three.min.js", "OrbitControls.js"}  # bundled so the 3D view works offline
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
     "empty": "Reading signal",
@@ -405,6 +406,12 @@ def create_app(options: RuntimeOptions) -> Starlette:
     async def demo_toggle(_request: Request) -> JSONResponse:
         return JSONResponse({"active": await runtime.toggle_demo()})
 
+    async def vendor_file(request: Request) -> Response:
+        name = request.path_params["name"]
+        if name not in VENDOR_FILES:
+            return error("Not found", 404)
+        return FileResponse(CSI_PAGE.parent / "vendor" / name, media_type="text/javascript")
+
     async def csi_page(_request: Request) -> Response:
         if not CSI_PAGE.exists():
             return error(f"CSI page not found at {CSI_PAGE}", 404)
@@ -466,6 +473,7 @@ def create_app(options: RuntimeOptions) -> Starlette:
     routes = [
         Route("/", dashboard),
         Route("/csi", csi_page),
+        Route("/vendor/{name}", vendor_file),
         Route("/demo", demo_toggle, methods=["POST"]),
         Route("/health", health),
         Route("/telemetry", telemetry),

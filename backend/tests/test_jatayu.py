@@ -593,3 +593,16 @@ def test_key_7_drives_the_console_too():
         back = wait_status(client, lambda s: s["rf"]["state"] != "PERIODIC_PATTERN_OBSERVED")
         assert back["source"] == "live"
         assert "simulated" not in client.get("/api/rf/history").text
+
+
+def test_3d_library_is_served_locally_and_only_listed_files():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "c.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        assert "cdn.jsdelivr" not in client.get("/csi").text
+        assert client.get("/vendor/three.min.js").status_code == 200
+        assert client.get("/vendor/OrbitControls.js").status_code == 200
+        assert client.get("/vendor/secrets.txt").status_code == 404
