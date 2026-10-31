@@ -536,3 +536,61 @@ def test_native_usb_port_preferred_over_uart_bridge(monkeypatch):
              {"device": "/dev/ttyACM1", "vid": "303A", "candidate": True}]
     monkeypatch.setattr(serial_io, "list_serial_ports", lambda: ports)
     assert serial_io.find_esp32_port() == "/dev/ttyACM1"
+
+
+def test_console_and_csi_pages_are_served():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        home = client.get("/")
+        assert home.status_code == 200 and "JATAYU Console" in home.text
+        assert "Not a calibrated or certified" in home.text or "not a gas concentration" in home.text
+        for banned in ("survivor detected", "Breathing detected"):
+            assert banned.lower() not in home.text.lower()
+        csi = client.get("/csi")
+        assert csi.status_code == 200 and "RescueSense Console" not in csi.text
+
+
+def test_console_has_guidance_and_signal_lab():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        home = client.get("/").text
+        for needle in ("What to do next", "Setup checklist", "Signal lab", "/csi?embed=1", "Help and glossary", "Take the tour", "Simple", "Text size"):
+            assert needle in home, needle
+        lab = client.get("/csi?embed=1").text
+        assert "How to use this view" in lab and "Record empty room" in lab
+
+
+def test_key_7_drives_the_console_too():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(serial_port="no-such-port", arduino_port="none",
+                                         calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+
+    def wait_status(client, check):
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            status = client.get("/api/status").json()
+            if check(status):
+                return status
+            time.sleep(0.2)
+        raise AssertionError(status)
+
+    with TestClient(backend_app.create_app(options)) as client:
+        assert client.get("/api/status").json()["source"] == "live"
+        assert client.post("/demo").json() == {"active": True}
+        shown = wait_status(client, lambda s: s["rf"]["state"] == "PERIODIC_PATTERN_OBSERVED")
+        assert shown["source"] == "demo"
+        assert client.post("/demo").json() == {"active": False}
+        back = wait_status(client, lambda s: s["rf"]["state"] != "PERIODIC_PATTERN_OBSERVED")
+        assert back["source"] == "live"
+        assert "simulated" not in client.get("/api/rf/history").text

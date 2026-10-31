@@ -292,6 +292,15 @@
   </header>
 
   <main>
+    <div id="howTo" style="margin:14px 0;padding:12px 16px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.35);line-height:1.5">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><b>How to use this view</b><button type="button" id="howToClose" style="all:unset;cursor:pointer;padding:2px 8px;border:1px solid rgba(148,170,196,.4);border-radius:6px;font-size:12px">Hide</button></div>
+      <ol style="margin:6px 0 0;padding-left:20px">
+        <li>Check the top bar says <b>Live</b> and the packet rate is near 100 per second.</li>
+        <li>With the room empty and still, press <b>Record empty room</b> in the Calibration card (30 seconds). Do this again if you move the router, the ESP32 or furniture.</li>
+        <li>Optional: record <b>distance anchors</b> at 1 to 5 metres to enable the estimated proximity figure.</li>
+        <li>Watch the state and the waveform. A regular pattern is an observation to review, not proof of a person.</li>
+      </ol>
+    </div>
     <div class="grid">
       <!-- A signal-driven visualisation, never a camera or pose reconstruction. -->
       <section class="card scene-card" id="sceneCard" aria-labelledby="sceneTitle">
@@ -1027,7 +1036,8 @@
     function drawRadar(staticOnly) {
       const canvas = $('radar');
       const { ctx, w, h } = fit(canvas);
-      const cx = w / 2, cy = h - 30, R = Math.min(w / 2 - 14, h - 44), maxM = 5;
+      if (w < 120 || h < 90) return; // not laid out yet (or hidden): a negative radius would throw
+      const cx = w / 2, cy = h - 30, R = Math.max(10, Math.min(w / 2 - 14, h - 44)), maxM = 5;
       const rOf = (m) => (m / maxM) * R;
       // range arcs, labelled along the right-hand baseline
       for (let m = 1; m <= maxM; m++) {
@@ -1183,5 +1193,13 @@
     redrawStatic(); updateClock(); connect(); requestAnimationFrame(loop);
   })();
   </script>
+<a href="/" style="position:fixed;top:10px;right:14px;z-index:9999;padding:5px 11px;border-radius:8px;background:#2a78d6;color:#fff;font:13px system-ui,sans-serif;text-decoration:none">&larr; JATAYU console</a>
+<script>
+(function () {
+  try { if (localStorage.getItem('jatayu-howto-hidden') === '1') document.getElementById('howTo').style.display = 'none'; } catch (e) {}
+  document.getElementById('howToClose').addEventListener('click', function () { document.getElementById('howTo').style.display = 'none'; try { localStorage.setItem('jatayu-howto-hidden', '1'); } catch (e) {} });
+  if (new URLSearchParams(location.search).get('embed') === '1') document.querySelectorAll('a[href="/"]').forEach(function (a) { a.remove(); });
+})();
+</script>
 </body>
 </html>

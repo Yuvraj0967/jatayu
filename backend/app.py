@@ -36,11 +36,13 @@ from processing import CSIProcessor, ProcessorConfig
 from serial_io import SerialCSIReader, SimulatedCSIProducer, list_serial_ports, scenario_bpm
 from jatayu.api import LiveHub, build_routes
 from jatayu.arduino_io import ArduinoReader, SimulatedArduino
+from jatayu.fusion import RfAssessor
 from jatayu.service import JatayuService
 from jatayu.store import Store
 
 BACKEND_DIR = Path(__file__).resolve().parent
-DASHBOARD = BACKEND_DIR.parent / "dashboard" / "index.html"
+DASHBOARD = BACKEND_DIR.parent / "dashboard" / "console.html"  # JATAYU operator console (served at /)
+CSI_PAGE = BACKEND_DIR.parent / "dashboard" / "index.html"  # CSI view and calibration (served at /csi)
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
     "empty": "No clear periodic pattern",
@@ -100,6 +102,7 @@ class RescueRuntime:
         self.scenario_started: float | None = None
         # Key 7 on the dashboard: simulated source beside the real one (docs/system-guide.md).
         self.demo: tuple[SimulatedCSIProducer, CSIProcessor] | None = None
+        self.demo_assessor = RfAssessor()
         self.store = Store(options.db_path)
         self.hub = LiveHub()
         self.jatayu = JatayuService(self.store, simulated=options.simulate)
@@ -200,7 +203,11 @@ class RescueRuntime:
                 await self.set_alert(bool(telemetry["presence"]), origin="auto")
             telemetry.update(self._envelope())
             # Simulated readings from key 7 are never stored as observations.
-            snapshot = self.jatayu.snapshot() if demo else self.jatayu.tick(telemetry)
+            if demo:
+                self.jatayu.demo_rf = self.demo_assessor.assess(telemetry, time.time())
+                snapshot = self.jatayu.snapshot()
+            else:
+                snapshot = self.jatayu.tick(telemetry)
             await self.hub.broadcast(snapshot)
             telemetry["jatayu"] = snapshot
             self.latest = telemetry
@@ -282,6 +289,7 @@ class RescueRuntime:
 
         if self.demo is not None or (self.simulator is not None and self.scenario_started is not None):
             self.demo, self.scenario_started = None, None
+            self.jatayu.demo_rf = None
             self.log("simulation", "Scripted simulation off.")
             return False
         if self.simulator is None:
@@ -294,6 +302,7 @@ class RescueRuntime:
             for frame in await asyncio.to_thread(sim.prime, processor.config.window_seconds):
                 processor.add_frame(frame)
             self.demo = (sim, processor)
+            self.demo_assessor = RfAssessor()
         self.scenario_started = time.monotonic()
         self.log("simulation", "Scripted simulation on.")
         return True
@@ -392,6 +401,14 @@ def create_app(options: RuntimeOptions) -> Starlette:
             return error(f"Dashboard not found at {DASHBOARD}", 404)
         return FileResponse(DASHBOARD, headers={"Cache-Control": "no-store"})
 
+    async def demo_toggle(_request: Request) -> JSONResponse:
+        return JSONResponse({"active": await runtime.toggle_demo()})
+
+    async def csi_page(_request: Request) -> Response:
+        if not CSI_PAGE.exists():
+            return error(f"CSI page not found at {CSI_PAGE}", 404)
+        return FileResponse(CSI_PAGE, headers={"Cache-Control": "no-store"})
+
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse(runtime.status())
 
@@ -447,6 +464,8 @@ def create_app(options: RuntimeOptions) -> Starlette:
 
     routes = [
         Route("/", dashboard),
+        Route("/csi", csi_page),
+        Route("/demo", demo_toggle, methods=["POST"]),
         Route("/health", health),
         Route("/telemetry", telemetry),
         Route("/ports", ports),

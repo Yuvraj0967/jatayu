@@ -17,7 +17,8 @@ Update it whenever the setup or a result changes. Last updated 2026-10-31.
 
 | Address | Data source | Started by |
 | --- | --- | --- |
-| `http://192.168.137.10:8000` | **Real** CSI from the ESP32, or **simulated** after pressing `7` | `jatayu.service` |
+| `http://192.168.137.10:8000` | Operator console. **Real** data, or **simulated** after pressing `7` | `jatayu.service` |
+| `http://192.168.137.10:8000/csi` | Original signal view and calibration. Same data and same key | `jatayu.service` |
 
 ## Simulation
 
@@ -28,7 +29,7 @@ not a measurement and is not evidence the system detects anything.
 - Generator: `SimulatedCSIProducer` in `backend/serial_io.py` and `SimulatedArduino` in `backend/jatayu/arduino_io.py`. Default: 15 cycles/min at 2.5 m.
 - **Script:** the rate shown goes from 14 to 19 over 8 s, back to 14 over 8 s, wavers around 14 for 8 s, then holds at 14. This is a script, not an analysis result.
 - Hardware-free mode: `.venv/bin/python app.py --simulate`, with scenario controls at `/#controls`.
-- Records stay separate: `/telemetry` reports `"source": "simulation"`, and readings made after pressing `7` are never stored as observations. The ESP32 keeps being read in the background.
+- Records stay separate: `/telemetry` reports `"source": "simulation"`, `/api/status` reports `"source": "demo"`, the console badge shows Connected instead of Live hardware, and readings made after pressing `7` are never stored as observations. The ESP32 keeps being read in the background.
 - The header says `Connected` in simulation and `Live` only for a real stream.
 - **Tell anyone watching a demo when this view is simulated**, and do not quote its numbers as measured results.
 

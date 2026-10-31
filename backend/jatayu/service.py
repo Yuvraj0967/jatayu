@@ -40,6 +40,7 @@ class JatayuService:
         self.arduino_online = False
         self.csi_online = False
         self.rf_state: dict[str, Any] = {"state": "NO_DATA"}
+        self.demo_rf: dict[str, Any] | None = None  # set only during the key 7 simulation
         self.gas_state: dict[str, Any] = {}
         self.tick_ms = 0.0
         self._last_rf_state: str | None = None
@@ -307,11 +308,11 @@ class JatayuService:
         with self.lock:
             return {
                 "type": "jatayu",
-                "source": self.source,
+                "source": "demo" if self.demo_rf else self.source,
                 "monitoring": self.monitoring,
                 "devices": {"esp32": "online" if self.csi_online else "offline",
                             "arduino": "online" if self.arduino_online else "offline"},
-                "rf": self.rf_state,
+                "rf": self.demo_rf or self.rf_state,
                 "environment": self.gas_state,
                 "last_key": self.last_key,
                 "lcd_page": self.lcd_page,
