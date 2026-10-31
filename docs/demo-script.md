@@ -1,6 +1,6 @@
 # JATAYU demo script
 
-About 4 minutes. Open `http://192.168.137.10:8000` on the laptop. Check beforehand that the hotspot is on, the header says
+About 5 minutes. Open `http://192.168.137.10:8000` on the laptop. Check beforehand that the hotspot is on, the header says
 `Live hardware` and packets are arriving.
 
 | Time | Do | Say |
@@ -11,7 +11,9 @@ About 4 minutes. Open `http://192.168.137.10:8000` on the laptop. Check beforeha
 | 2:00 | Press `7` | "To show how the workflow behaves when a steady rhythm is present, I'm switching to simulated data. From here until I switch back, nothing on screen is measured." |
 | 2:20 | On `/csi` the rate goes 14 to 19 and back and the 3D figure animates; then open the console at `/` and start monitoring | "This is the operator's view. A sustained pattern becomes an observation for a person to review, not an automatic conclusion." |
 | 3:00 | Press `7` again | "Back on real data." |
-| 3:10 | Show the report's results section | "Our data path works on real hardware with about 0.1% packet loss. In our first real trial, in a busy room, we did not find a clear breathing rhythm. Next: quieter trials with a hand count, and testing the Arduino gas sensor and keypad on the real board." |
+| 3:10 | On `/csi`, scroll to the gas card and breathe near the MQ-135 | "The Arduino sends raw gas sensor readings to the Pi. We watch for change against a baseline measured on site. These aren't gas concentrations and this isn't a safety measurement." |
+| 3:30 | Press `0` then `2` on the keypad | "Responders can report from the field without paper or word of mouth. This number is what the operator typed. The system doesn't measure it." Then press `0` `0` to undo. |
+| 3:50 | Show the report's results section | "Our data path works on real hardware with about 0.1% packet loss. In our first real trial, in a busy room, we did not find a clear breathing rhythm. Next: quieter trials with a hand count, and testing the Arduino gas sensor and keypad on the real board." |
 
 **Rules for the demo**
 

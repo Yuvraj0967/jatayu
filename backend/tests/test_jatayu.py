@@ -671,3 +671,9 @@ def test_uno_firmware_messages_are_accepted():
                  '{"type":"cmd_ack","command_id":"c1","status":"failed","detail":"not supported on this board"}'):
         assert protocol.parse_line(line)["type"] in {"hello", "sensor_reading", "key_event", "cmd_ack"}
 
+
+def test_signal_view_has_gas_card_and_no_gas_concentration_claim():
+    page = (Path(__file__).resolve().parents[2] / "dashboard" / "index.html").read_text(encoding="utf-8")
+    assert 'id="gasCard"' in page and "/api/sensors/history" in page and "Not a gas concentration" in page
+    assert "ppm" not in page.lower()
+

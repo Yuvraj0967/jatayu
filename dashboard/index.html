@@ -424,6 +424,20 @@
         <button class="btn small" id="simMotion" type="button" style="width:100%">Add 4 s of disturbance</button>
       </section>
 
+      <!-- Gas sensor -->
+      <section class="card" id="gasCard" style="grid-column:1/-1" aria-labelledby="gasTitle">
+        <div class="card-head"><h2 class="card-title" id="gasTitle">Gas sensor</h2><span class="card-note" id="gasModel">--</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+          <div class="metric"><div class="l"><span class="dot" id="gasDot"></span>Status</div><div class="v" id="gasStatus">--</div></div>
+          <div class="metric"><div class="l">Raw reading</div><div class="v" id="gasRaw">--<small>ADC</small></div></div>
+          <div class="metric"><div class="l">Baseline</div><div class="v" id="gasBase">--<small>ADC</small></div></div>
+          <div class="metric"><div class="l">Elevated above</div><div class="v" id="gasLimit">--<small>ADC</small></div></div>
+          <div class="metric"><div class="l">Change from baseline</div><div class="v" id="gasDelta">--</div></div>
+        </div>
+        <svg id="gasChart" viewBox="0 0 600 90" preserveAspectRatio="none" role="img" aria-label="Recent gas sensor readings" style="display:block;width:100%;height:90px;margin:12px 0 8px"><line id="gasLimitLine" x1="0" x2="600" stroke="var(--warn)" stroke-dasharray="5 5" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/><polyline id="gasLine" fill="none" stroke="var(--info)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><span class="card-note" id="gasNote" style="white-space:normal">Waiting for the sensor.</span><button class="btn small" id="gasRebase" type="button">Re-measure baseline</button></div>
+      </section>
+
       <!-- Events -->
       <section class="card span-6" id="eventsCard" aria-labelledby="evTitle">
         <div class="card-head"><h2 class="card-title" id="evTitle">Event log</h2><span class="card-note">newest first</span></div>
@@ -553,7 +567,7 @@
       if (d.source === 'simulation') setLink('ok', `Connected · ${fmt(link.packet_rate_hz, 0)} pkt/s`);
       else {
         const s = d.serial || {};
-        if (s.state === 'streaming') setLink('ok', `Live · ${s.port} · ${fmt(s.packet_rate_hz, 0)} pkt/s`);
+        if (s.state === 'streaming') setLink('ok', `Live · ESP32 · ${fmt(s.packet_rate_hz, 0)} pkt/s`);
         else if (s.state === 'open') setLink('warn', `${s.port} open · waiting for CSI rows`);
         else setLink('bad', s.error ? truncate(s.error, 70) : 'Looking for the ESP32…');
       }
@@ -586,6 +600,7 @@
         ? `${Number(d.distance_m).toFixed(1)} m ± ${Number(d.distance_uncertainty_m).toFixed(1)}`
         : (cal.mapping_ready ? 'waiting for a detection' : 'needs calibration');
 
+      renderGas((d.jatayu || {}).environment);
       renderHealth(d); renderCalibration(cal); renderSimulation(d); renderEvents(d.events || []);
       if (typeof d.alert_active === 'boolean') setAlert(d.alert_active, d.alert_delivered);
       drawSpectrum(); drawHeatmap(); drawTimeline(); drawRadar(true);
@@ -615,7 +630,7 @@
       $('mKeypad').textContent = `${jat.last_key ? jat.last_key.key : '--'} / ${(jat.lives || {}).total || 0}`;
       showLives(jat.lives);
       $('mDropped').textContent = `${link.dropped_width || 0} odd · ${link.gain_steps_corrected || 0} steps`;
-      $('sourceNote').textContent = d.serial && d.serial.port ? `${d.serial.port} @ ${d.serial.baud}` : '';
+      $('sourceNote').textContent = d.serial && d.serial.port ? `USB @ ${d.serial.baud}` : '';
       const lines = [];
       if (d.serial) {
         const dev = d.serial.device || {};
@@ -691,6 +706,41 @@
     $('simDist').addEventListener('input', (e) => { $('simDistOut').textContent = `${Number(e.target.value).toFixed(1)} m`; });
     $('simDist').addEventListener('change', (e) => send({ type: 'simulate', distance_m: Number(e.target.value) }));
     $('simMotion').addEventListener('click', () => send({ type: 'simulate', motion_seconds: 4 }));
+
+    // Gas sensor: raw counts only, never a concentration.
+    const GAS_STATES = { NORMAL: ['Normal', 'ok'], ELEVATED: ['Elevated', 'bad'], WARMING_UP: ['Warming up', 'info'], BASELINING: ['Baselining', 'info'], STALE: ['No recent data', 'warn'], NO_DATA: ['No data', ''] };
+    const gasHistory = [];
+    fetch('/api/sensors/history?limit=300').then((r) => r.json()).then((rows) => {
+      const old = rows.map((row) => row.raw_value).filter((v) => v != null);
+      gasHistory.unshift(...old.slice(-(300 - gasHistory.length)));
+    }).catch(() => {});
+    function drawGas(limit) {
+      const points = gasHistory.slice(-300);
+      if (points.length < 2) return;
+      const high = Math.max(...points, limit || 0), low = Math.min(...points), span = Math.max(high - low, 10), top = high + span * .1, range = span * 1.2;
+      const yOf = (v) => 86 - 82 * (v - (top - range)) / range;
+      $('gasLine').setAttribute('points', points.map((v, i) => `${(i * 600 / (points.length - 1)).toFixed(1)},${yOf(v).toFixed(1)}`).join(' '));
+      const line = $('gasLimitLine');
+      line.setAttribute('visibility', limit != null ? 'visible' : 'hidden');
+      if (limit != null) { line.setAttribute('y1', yOf(limit)); line.setAttribute('y2', yOf(limit)); }
+    }
+    function renderGas(env) {
+      if (!env) return;
+      const [label, tone] = GAS_STATES[env.status] || [env.status || '--', ''];
+      const counts = (v) => `${v != null ? Math.round(v) : '--'}<small>ADC</small>`;
+      $('gasDot').className = `dot ${tone}`;
+      $('gasStatus').textContent = label;
+      $('gasRaw').innerHTML = counts(env.raw_adc);
+      $('gasBase').innerHTML = counts(env.baseline_adc);
+      $('gasLimit').innerHTML = counts(env.threshold_adc);
+      $('gasDelta').textContent = env.raw_adc != null && env.baseline_adc != null ? `${env.raw_adc >= env.baseline_adc ? '+' : ''}${Math.round(env.raw_adc - env.baseline_adc)}` : '--';
+      $('gasModel').textContent = env.model ? `${env.model} · not calibrated` : 'not calibrated';
+      const wait = env.warmup_remaining_s ? `Warming up: about ${Math.ceil(env.warmup_remaining_s)} s left. ` : '';
+      $('gasNote').textContent = `${wait}Raw readings from 0 to 1023 that show change over time. Not a gas concentration or a safety measurement.`;
+      if (env.raw_adc != null && env.age_s != null && env.age_s < 3) { gasHistory.push(env.raw_adc); if (gasHistory.length > 600) gasHistory.splice(0, 300); }
+      drawGas(env.threshold_adc);
+    }
+    $('gasRebase').addEventListener('click', () => { fetch('/api/sensors/rebaseline', { method: 'POST' }).then(() => toast('Measuring a new baseline after warm-up.')).catch(() => toast('Could not reach the backend.', true)); });
 
     // Lives-saved popup, from keypad codes 01-09 (undo with 00).
     let livesSeen = null;
