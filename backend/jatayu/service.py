@@ -15,6 +15,9 @@ from .commands import CommandTracker
 from .fusion import OBSERVATION_LABELS, GasAssessor, GasConfig, RfAssessor, RfConfig
 from .store import Store
 
+LIVES_REPORTED, LIVES_UNDONE = "LIVES_SAVED_REPORTED", "LIVES_SAVED_UNDONE"
+CODE_WINDOW_S = 3.0  # time allowed between the 0 and the digit of a keypad code
+
 LCD_PAGES = ("overview", "sensor", "rf", "system", "incidents", "diagnostics")
 
 
@@ -36,6 +39,15 @@ class JatayuService:
         self.monitoring = False
         self.lcd_page = "overview"
         self.last_key: dict[str, Any] | None = None
+        self.has_lcd = True  # the UNO says otherwise in its hello
+        self._code_until = 0.0
+        self._lives: list[int] = []
+        for event in store.events_of_types((LIVES_REPORTED, LIVES_UNDONE)):
+            if event["event_type"] == LIVES_REPORTED:
+                self._lives.append(int(event["payload"]["count"]))
+            elif self._lives:
+                self._lives.pop()
+        self._lives_last: dict[str, Any] | None = None
         self.last_arduino_at: float | None = None
         self.arduino_online = False
         self.csi_online = False
@@ -89,7 +101,9 @@ class JatayuService:
                 self._on_key(msg, now)
             elif kind == "cmd_ack":
                 self.commands.on_device_ack(msg["command_id"], msg["status"], msg.get("detail"))
-            # hello / status only refresh liveness
+            elif kind == "hello" and msg.get("lcd") is False:
+                self.has_lcd = False
+            # otherwise hello / status only refresh liveness
 
     def _on_reading(self, msg: dict[str, Any], now: float) -> None:
         sim = bool(msg.get("simulated")) or self.simulated
@@ -101,8 +115,16 @@ class JatayuService:
 
     def _on_key(self, msg: dict[str, Any], now: float) -> None:
         key, action = msg["key"], msg["action"]
+        code_digit = now <= self._code_until and key.isdigit()
+        self._code_until = 0.0 if code_digit or key != "0" else now + CODE_WINDOW_S
+        if code_digit:
+            action = "REPORT_LIVES_SAVED"
         self.last_key = {"key": key, "action": action, "at": now}
         self._emit("KEY_PRESSED", "operator", {"key": key, "action": action})
+        if code_digit:
+            self._report_lives(int(key), now)
+            self.publish({"type": "key", "key": self.last_key})
+            return
         if action == "START_MONITORING":
             self.start_monitoring(actor="keypad")
         elif action == "STOP_MONITORING":
@@ -119,6 +141,23 @@ class JatayuService:
         elif action == "CANCEL":
             self.lcd_page = "overview"
         self.publish({"type": "key", "key": self.last_key})
+
+    def _report_lives(self, count: int, now: float) -> None:
+        """Keypad code 0n: the operator reports n lives saved; 00 undoes the last report."""
+
+        if count > 0:
+            self._lives.append(count)
+            event, text = LIVES_REPORTED, f"{count} {'life' if count == 1 else 'lives'} saved"
+        elif self._lives:
+            count = self._lives.pop()
+            event, text = LIVES_UNDONE, f"Last report undone ({count} removed)"
+        else:
+            return
+        payload = {"count": count, "total": sum(self._lives)}
+        event_id = self.store.add_event(event, "operator", {**payload, "source": self.source}, now)
+        self._lives_last = {"id": event_id, "count": count, "text": text, "at": now}
+        self.publish({"type": "event", "event": {"id": event_id, "event_type": event, "actor": "operator",
+                                                 "payload": payload, "incident_id": None, "created_at": now}})
 
     # -- operator actions --------------------------------------------------------
     def start_monitoring(self, actor: str = "dashboard") -> dict[str, Any]:
@@ -140,6 +179,8 @@ class JatayuService:
             now = time.time()
             incident_id = self._add_observation("inspection_request", None, {"actor": actor, "notes": notes}, now, force=True)
             self._emit("INSPECTION_REQUEST_CREATED", actor, {"notes": notes}, incident_id)
+            if not self.has_lcd:
+                return {"incident_id": incident_id, "command": None}
             code = (self.store.incident(incident_id) or {}).get("incident_code", "")
             line1, line2 = "INSPECT REQUESTED", code[-9:]
             cmd = self.commands.issue("LCD_SHOW", {"line1": line1, "line2": line2}, incident_id=incident_id,
@@ -285,7 +326,7 @@ class JatayuService:
         return self.snapshot()
 
     def _refresh_lcd(self) -> None:
-        if not (self.arduino and self.arduino.connected):
+        if not (self.arduino and self.arduino.connected and self.has_lcd):
             return
         counts = self.store.count_incidents()
         active = counts.get("open", 0) + counts.get("acknowledged", 0)
@@ -315,6 +356,7 @@ class JatayuService:
                 "rf": self.demo_rf or self.rf_state,
                 "environment": self.gas_state,
                 "last_key": self.last_key,
+                "lives": {"total": sum(self._lives), "last": self._lives_last},
                 "lcd_page": self.lcd_page,
                 "incident_counts": self.store.count_incidents(),
                 "performance": {"tick_ms": self.tick_ms},

@@ -491,12 +491,15 @@ function renderTiles() {
   T.append(
     tile('Monitoring', st.monitoring ? 'On' : 'Off', st.monitoring ? 'Incidents can open' : 'Observations are not grouped into incidents', st.monitoring ? '●' : '○', st.monitoring ? 'var(--accent)' : 'var(--text-3)'),
     tile('ESP32 CSI node', on(dev.esp32) ? 'Online' : 'Offline', on(dev.esp32) ? `${num(csi.packet_rate_hz || (rf.features || {}).packet_rate_hz, 0)} packets/s` : 'No CSI stream', on(dev.esp32) ? '●' : '○', on(dev.esp32) ? 'var(--good)' : 'var(--text-3)'),
-    tile('Arduino Mega', on(dev.arduino) ? 'Online' : 'Offline', on(dev.arduino) ? 'Receiving readings' : 'No messages', on(dev.arduino) ? '●' : '○', on(dev.arduino) ? 'var(--good)' : 'var(--text-3)'),
+    tile('Keypad', st.last_key ? st.last_key.key : '--', st.last_key ? pretty(st.last_key.action) : 'No key pressed yet', '⌨', on(dev.arduino) ? 'var(--accent)' : 'var(--text-3)'),
+    tile('Lives saved', String((st.lives || {}).total || 0), 'Reported from the keypad: 01 to 09, 00 undoes', '✓', 'var(--good)'),
+    tile('Arduino', on(dev.arduino) ? 'Online' : 'Offline', on(dev.arduino) ? 'Receiving readings' : 'No messages', on(dev.arduino) ? '●' : '○', on(dev.arduino) ? 'var(--good)' : 'var(--text-3)'),
     tile('RF state', pretty(rf.state), rf.text || '', (RF_STYLE[rf.state] || ['', ''])[0], (RF_STYLE[rf.state] || ['', ''])[1]),
     tile('Environment', (ENV_STYLE[env.status] || [0, 0, pretty(env.status)])[2], env.raw_adc != null ? `${env.raw_adc} ADC counts` : 'No reading', (ENV_STYLE[env.status] || [''])[0], (ENV_STYLE[env.status] || ['', ''])[1]),
     tile('Active incidents', String((c.open || 0) + (c.acknowledged || 0)), `${c.open || 0} open, ${c.acknowledged || 0} acknowledged, ${c.closed || 0} closed`),
   );
   renderGuide();
+  showLives(st.lives);
 }
 function renderRF() {
   const st = S.status; if (!st) return; const rf = st.rf || {}, f = rf.features || {}, [ic, col] = RF_STYLE[rf.state] || ['', 'var(--text-3)'];
@@ -861,6 +864,22 @@ function connect() {
   ws.onclose = () => { S.ws = 'lost'; renderTop(); setTimeout(connect, Math.min(10000, 1000 * ++wsRetry)); };
   ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
+// Lives-saved popup, from keypad codes 01-09 (undo with 00).
+    let livesSeen = null;
+    function showLives(lives) {
+      const last = lives && lives.last;
+      const id = last ? last.id : 0;
+      if (livesSeen === null) { livesSeen = id; return; }
+      if (id === livesSeen || !last) return;
+      livesSeen = id;
+      const box = document.getElementById('livesPopup');
+      box.querySelector('b').textContent = last.text;
+      box.querySelector('span').textContent = `Reported from the keypad · total ${lives.total}`;
+      box.style.display = 'block';
+      clearTimeout(showLives.t);
+      showLives.t = setTimeout(() => { box.style.display = 'none'; }, 6000);
+    }
+
 // Key 7 toggles the scripted simulation (docs/system-guide.md).
 document.addEventListener('keydown', (e) => {
   if (e.key === '7' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) fetch('/demo', { method: 'POST' });
@@ -872,5 +891,6 @@ setInterval(refreshLists, 4000);
 setInterval(refreshSeries, 5000);
 new ResizeObserver(() => { clearTimeout(window.__rs); window.__rs = setTimeout(() => { renderRF(); renderEnv(); }, 150); }).observe(document.body);
 </script>
+<div id="livesPopup" role="status" style="display:none;position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:50;padding:22px 34px;text-align:center;background:#0f2a22;border:2px solid #34d399;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);color:#ecfdf5"><b style="display:block;font-size:30px;margin-bottom:6px"></b><span style="font-size:14px;opacity:.85"></span></div>
 </body>
 </html>

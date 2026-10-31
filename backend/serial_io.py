@@ -444,7 +444,7 @@ class SerialCSIReader:
             port = find_esp32_port()
             if port is None:
                 self.state = "searching"
-                self.error = "No ESP32 USB serial port found. Plug the board into the UART/COM connector."
+                self.error = "No ESP32 USB serial port found. Check the USB cable and socket."
                 return False
         device = serial.Serial()
         device.port = port

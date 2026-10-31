@@ -385,6 +385,7 @@
           <div class="metric"><div class="l"><span class="dot" id="rssiDot"></span>RSSI</div><div class="v" id="mRssi">--<small>dBm</small></div></div>
           <div class="metric"><div class="l">Subcarriers used</div><div class="v" id="mCarriers">--</div></div>
           <div class="metric"><div class="l">Analysis window</div><div class="v" id="mWindow">--<small>s</small></div></div>
+          <div class="metric"><div class="l">Keypad / lives saved</div><div class="v" id="mKeypad">--</div></div>
           <div class="metric"><div class="l">Odd / bad packets</div><div class="v" id="mDropped">--</div></div>
         </div>
         <div class="device-line" id="deviceLog">No device messages yet.</div>
@@ -610,6 +611,9 @@
       $('rssiDot').className = `dot ${rssi == null ? '' : rssi >= -60 ? 'ok' : rssi >= -75 ? 'warn' : 'bad'}`;
       $('mCarriers').textContent = link.subcarriers_used != null ? `${link.subcarriers_used} / ${link.frame_width}` : (link.frame_width ? `-- / ${link.frame_width}` : '--');
       $('mWindow').innerHTML = `${fmt(link.window_seconds, 0)}<small>s</small>`;
+      const jat = d.jatayu || {};
+      $('mKeypad').textContent = `${jat.last_key ? jat.last_key.key : '--'} / ${(jat.lives || {}).total || 0}`;
+      showLives(jat.lives);
       $('mDropped').textContent = `${link.dropped_width || 0} odd · ${link.gain_steps_corrected || 0} steps`;
       $('sourceNote').textContent = d.serial && d.serial.port ? `${d.serial.port} @ ${d.serial.baud}` : '';
       const lines = [];
@@ -687,6 +691,22 @@
     $('simDist').addEventListener('input', (e) => { $('simDistOut').textContent = `${Number(e.target.value).toFixed(1)} m`; });
     $('simDist').addEventListener('change', (e) => send({ type: 'simulate', distance_m: Number(e.target.value) }));
     $('simMotion').addEventListener('click', () => send({ type: 'simulate', motion_seconds: 4 }));
+
+    // Lives-saved popup, from keypad codes 01-09 (undo with 00).
+    let livesSeen = null;
+    function showLives(lives) {
+      const last = lives && lives.last;
+      const id = last ? last.id : 0;
+      if (livesSeen === null) { livesSeen = id; return; }
+      if (id === livesSeen || !last) return;
+      livesSeen = id;
+      const box = document.getElementById('livesPopup');
+      box.querySelector('b').textContent = last.text;
+      box.querySelector('span').textContent = `Reported from the keypad · total ${lives.total}`;
+      box.style.display = 'block';
+      clearTimeout(showLives.t);
+      showLives.t = setTimeout(() => { box.style.display = 'none'; }, 6000);
+    }
 
     // --------------------------------------------------------------- events
     const EVENT_COLOR = { state: C.brand, alert: '#ff4d61', calibration: C.ok, error: C.bad, source: C.info, simulation: C.warn, model: C.info };
@@ -1186,5 +1206,6 @@
   if (new URLSearchParams(location.search).get('embed') === '1') document.querySelectorAll('a[href="/"]').forEach(function (a) { a.remove(); });
 })();
 </script>
+<div id="livesPopup" role="status" style="display:none;position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:50;padding:22px 34px;text-align:center;background:#0f2a22;border:2px solid #34d399;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);color:#ecfdf5"><b style="display:block;font-size:30px;margin-bottom:6px"></b><span style="font-size:14px;opacity:.85"></span></div>
 </body>
 </html>

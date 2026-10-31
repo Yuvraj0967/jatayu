@@ -1,6 +1,6 @@
 # Starts the JATAYU backend when the Raspberry Pi boots and restarts it if it stops.
 # Install: see docs/firmware-setup.md, "Run on the Raspberry Pi".
-# --arduino-port none until the Mega firmware exists; change it to auto after that.
+# The ESP32 port is named so a CH340 UNO can never be mistaken for it while the ESP32 is unplugged.
 [Unit]
 Description=JATAYU backend
 After=network.target
@@ -8,7 +8,7 @@ After=network.target
 [Service]
 User=pi
 WorkingDirectory=/home/pi/JATAYU/backend
-ExecStart=/home/pi/JATAYU/backend/.venv/bin/python app.py --host 0.0.0.0 --arduino-port none
+ExecStart=/home/pi/JATAYU/backend/.venv/bin/python app.py --host 0.0.0.0 --serial-port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:A3:16:E7:8C:38-if00 --arduino-port auto
 Restart=always
 RestartSec=3
 

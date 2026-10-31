@@ -2,8 +2,8 @@
 
 JATAYU is a stationary, local-first prototype for organising **Wi-Fi CSI** and
 **environmental** observations in hazardous or inaccessible spaces, with an
-auditable human review workflow. An ESP32-S3 captures CSI, an Arduino Mega reads a
-gas sensor/keypad/LCD, and a Raspberry Pi 4B runs the DSP, database, API and dashboard.
+auditable human review workflow. An ESP32-S3 captures CSI, an Arduino UNO reads a
+gas sensor and keypad, and a Raspberry Pi 4B runs the DSP, database, API and dashboard.
 
 It is an **experimental decision-support demonstrator**. It does not identify survivors,
 detect breathing in a medically meaningful way, certify gas safety, or give exact position
@@ -33,7 +33,7 @@ Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment
 ## Live hardware
 
 1. Flash the ESP32-S3: see [docs/firmware-setup.md](docs/firmware-setup.md) (`.\tools\build-flash.ps1`; add `-Console usb` if the board only has the native USB port).
-2. Run `python app.py` (auto-detects the ESP32; add `--arduino-port /dev/ttyACM0` for the Mega, or `--arduino-port none`).
+2. Run `python app.py` (auto-detects the ESP32; add `--arduino-port /dev/ttyACM0` for the UNO, or `--arduino-port none`).
 3. On the Pi, `python app.py --host 0.0.0.0` and browse to `http://<pi-ip>:8000`.
 4. Record a 30 s empty-room baseline from the dashboard ([calibration](docs/calibration.md)).
 
@@ -45,8 +45,8 @@ Record labelled raw trials for experiments with `python capture_raw.py --label e
 | --- | --- |
 | CSI DSP, calibration, dashboard | Working (inherited), wording updated to observations |
 | ESP32 firmware v3.1 | Flashed and streaming to the Pi over native USB (unstable 5-70 pkt/s via laptop hotspot, target 100) |
-| Backend JATAYU layer + REST/WS API | running on the Pi with live CSI; 74 tests (simulation, real serial read loops, hard limits) |
-| Arduino Mega firmware | Not written |
+| Backend JATAYU layer + REST/WS API | running on the Pi with live CSI; tests cover (simulation, real serial read loops, hard limits) |
+| Arduino UNO firmware (MQ-135, keypad) | Written in `arduino/jatayu_uno`; not yet tested on the board |
 | Multi-node ingestion, localisation, 3D view | Not started (research goals) |
 
 ## Integrity of the claim

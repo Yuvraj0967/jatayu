@@ -19,6 +19,7 @@ MAX_LINE_BYTES = 512
 
 # Key -> (action, label). Mirrors the project documentation, section 7.2.
 KEY_ACTIONS: dict[str, tuple[str, str]] = {
+    # A 0 followed by a digit within 3 s is a lives-saved report (service.py).
     "1": ("START_MONITORING", "Start monitoring"),
     "2": ("STOP_MONITORING", "Stop monitoring"),
     "3": ("SHOW_SENSOR_STATUS", "Show sensor status"),

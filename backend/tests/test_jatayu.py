@@ -606,3 +606,68 @@ def test_3d_library_is_served_locally_and_only_listed_files():
         assert client.get("/vendor/three.min.js").status_code == 200
         assert client.get("/vendor/OrbitControls.js").status_code == 200
         assert client.get("/vendor/secrets.txt").status_code == 404
+
+
+def test_keypad_code_reports_lives_and_shows_in_snapshot():
+    svc = _service()
+    _key(svc, "0")
+    _key(svc, "2")
+    lives = svc.snapshot()["lives"]
+    assert lives["total"] == 2 and lives["last"]["text"] == "2 lives saved"
+    assert svc.monitoring is False  # the 2 was part of the code, not "stop monitoring"
+    _key(svc, "0")
+    _key(svc, "1")
+    assert svc.snapshot()["lives"]["total"] == 3
+    assert svc.snapshot()["lives"]["last"]["text"] == "1 life saved"
+
+
+def test_keypad_code_undo_and_empty_undo():
+    svc = _service()
+    _key(svc, "0")
+    _key(svc, "0")
+    assert svc.snapshot()["lives"]["last"] is None
+    for key in "05" "00":
+        _key(svc, key)
+    lives = svc.snapshot()["lives"]
+    assert lives["total"] == 0 and "undone" in lives["last"]["text"]
+
+
+def test_keys_outside_a_code_keep_their_normal_actions(monkeypatch):
+    svc = _service()
+    _key(svc, "1")
+    assert svc.monitoring is True
+    _key(svc, "0")
+    _key(svc, "#")  # a non-digit ends the code
+    _key(svc, "2")
+    assert svc.monitoring is False and svc.snapshot()["lives"]["total"] == 0
+    _key(svc, "1")
+    _key(svc, "0")
+    real_time = time.time
+    monkeypatch.setattr(time, "time", lambda: real_time() + 4.0)  # too slow for a code
+    _key(svc, "2")
+    assert svc.monitoring is False and svc.snapshot()["lives"]["total"] == 0
+
+
+def test_lives_total_survives_a_restart():
+    svc = _service()
+    for key in "03" "02" "00":
+        _key(svc, key)
+    assert JatayuService(svc.store, simulated=True).snapshot()["lives"]["total"] == 3
+
+
+def test_board_without_lcd_gets_no_lcd_commands():
+    device = FakeDevice()
+    svc = _service(device)
+    svc.handle_arduino_message(protocol.parse_line('{"type":"hello","lcd":false}'))
+    assert svc.request_inspection()["command"] is None
+
+
+def test_uno_firmware_messages_are_accepted():
+    source = (Path(__file__).resolve().parents[2] / "arduino" / "jatayu_uno" / "jatayu_uno.ino").read_text()
+    assert "115200" in source
+    for line in ('{"type":"hello","firmware":"jatayu-uno-1.0","model":"MQ-135","lcd":false}',
+                 '{"type":"sensor_reading","sensor":"mq_raw","model":"MQ-135","raw_adc":21,"calibration":"NOT_CALIBRATED","sensor_status":"ok","timestamp_ms":1000}',
+                 '{"type":"key_event","key":"A","r":0,"c":3}',
+                 '{"type":"cmd_ack","command_id":"c1","status":"failed","detail":"not supported on this board"}'):
+        assert protocol.parse_line(line)["type"] in {"hello", "sensor_reading", "key_event", "cmd_ack"}
+

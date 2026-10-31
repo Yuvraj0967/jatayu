@@ -15,7 +15,7 @@ About 90 seconds.
 - Working on real hardware: live capture, the Pi pipeline, the operator console and the incident workflow, at about 0.1% packet loss.
 - Tested in simulation: the full workflow, including the demo mode we'll show you.
 - Not yet proven: breathing detection on real signals. Our first trial, in a busy room, found no clear rhythm, and that is the next thing we're testing.
-- Not built yet: the Arduino firmware for the gas sensor and keypad, and multi-node sensing.
+- Not built yet: multi-node sensing; the Arduino gas sensor and keypad firmware is written but still being tested.
 
 **Ask.** Time and a quiet test space to run controlled trials, then feedback from people who work in search and rescue.
 

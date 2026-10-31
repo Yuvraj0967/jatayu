@@ -10,7 +10,7 @@ Update it whenever the setup or a result changes. Last updated 2026-10-31.
 | ESP32-S3 | JATAYU firmware 3.1 on hotspot `Amogh` (2.4 GHz). Prints on its **native USB** socket, which must go to the Pi (`303a:1001` in `lsusb`) |
 | Raspberry Pi 4B | `jatayu-pi`, `192.168.137.10`, backend in `~/JATAYU`, started at boot by `jatayu.service` |
 | Laptop | Runs the hotspot; its firewall allows ping from hotspot devices. Must not join another hotspot that uses `192.168.137.x` |
-| Arduino Mega | Firmware not written; backend runs with `--arduino-port none` |
+| Arduino UNO | MQ-135 on A0 and keypad on D2-D9. Connect to the Pi by USB. Firmware in `arduino/jatayu_uno`, not yet tested on the board |
 | Second Pi | Not used by any code |
 
 ## Dashboard
@@ -67,6 +67,12 @@ One trial, own room with other people nearby. **No breathing rhythm was found in
 | Person out of the link | 110 s (SSH dropped) | 48 | 0.00 | 0 | 6.6-23.0, median 12.3 |
 
 The estimates are too scattered to report as rates. No hand count was recorded.
+
+## Keypad reports
+
+Press `0` then a digit within 3 seconds to report lives saved: `02` shows a "2 lives saved" popup on every open page
+and adds to the running total, which survives restarts. `00` undoes the last report. Each report is a stored
+`LIVES_SAVED_REPORTED` event. **The number is what the operator entered; the system does not measure it.**
 
 ## Main screen
 

@@ -257,6 +257,13 @@ class Store:
             row["payload"] = _load(row.pop("payload_json"))
         return rows[::-1]
 
+    def events_of_types(self, event_types: tuple[str, ...]) -> list[dict[str, Any]]:
+        marks = ",".join("?" * len(event_types))
+        rows = self._rows(f"SELECT * FROM events WHERE event_type IN ({marks}) ORDER BY id", event_types)
+        for row in rows:
+            row["payload"] = _load(row.pop("payload_json"))
+        return rows
+
     def add_acknowledgement(self, incident_id: int, action: str, notes: str | None, channel: str, now: float) -> int:
         cur = self._exec(
             "INSERT INTO operator_acknowledgements(incident_id,operator_action,notes,channel,acknowledged_at) VALUES(?,?,?,?,?)",
