@@ -506,7 +506,6 @@ function renderRF() {
   const kv = clear($('rfKv'));
   const add = (k, v) => kv.append(h('dt', { text: k }), h('dd', {}, v));
   add('Data quality', rf.data_quality ? pretty(rf.data_quality) : '--');
-  add('Confidence', rf.confidence || '--');
   add('Periodicity score', rf.periodicity_score != null ? num(rf.periodicity_score, 2) : '--');
   add('Pattern held for', rf.pattern_seconds ? `${num(rf.pattern_seconds, 0)} s (review at 20 s)` : '--');
   add('Candidate rate', f.dominant_rate_per_min != null ? `${num(f.dominant_rate_per_min, 1)} cycles/min (a candidate, not a breathing rate)` : '--');

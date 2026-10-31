@@ -68,10 +68,16 @@ One trial, own room with other people nearby. **No breathing rhythm was found in
 
 The estimates are too scattered to report as rates. No hand count was recorded.
 
+## Main screen
+
+The main screens show readings continuously. The confidence figure and the "no clear pattern" wording were removed
+from them by project decision; `/api/status` and `/telemetry` still report both. **A rate on screen is the strongest
+candidate in the window, not proof of breathing, and it appears even when no rhythm exists.**
+
 ## Hard limits
 
 - Serial rows: at most 2000 characters and 128 subcarriers, amplitude 0-10000, RSSI -127 to 0 dBm, channel 1-14. Other rows are counted as dropped.
-- Outputs: rate within 6-30 cycles/min; confidence and scores within 0-1.
+- Outputs: rate within **11-30 cycles/min**; analysis searches only this band, so a true rate outside it cannot be reported correctly. Confidence and scores stay within 0-1.
 - Tools: recordings 1-3600 s and 0.1-500 MB; analysis under 500 ms in the time-budget test.
 
 

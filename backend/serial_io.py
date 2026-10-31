@@ -617,7 +617,7 @@ class SimulatedCSIProducer:
         if present is not None:
             self.present = bool(present)
         if bpm is not None:
-            self.bpm = float(np.clip(bpm, 6.0, 30.0))
+            self.bpm = float(np.clip(bpm, 11.0, 30.0))
         if distance_m is not None:
             self.distance_m = float(np.clip(distance_m, 0.5, 5.0))
         if motion_seconds:

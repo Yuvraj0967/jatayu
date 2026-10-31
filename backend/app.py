@@ -45,7 +45,7 @@ DASHBOARD = BACKEND_DIR.parent / "dashboard" / "console.html"  # JATAYU operator
 CSI_PAGE = BACKEND_DIR.parent / "dashboard" / "index.html"  # CSI view and calibration (served at /csi)
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
-    "empty": "No clear periodic pattern",
+    "empty": "Reading signal",
     "warming_up": "Collecting signal",
     "no_signal": "No CSI signal",
 }

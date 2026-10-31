@@ -23,7 +23,7 @@ RF_TEXT = {
     "COLLECTING": "Collecting signal",
     "INSUFFICIENT_DATA": "Insufficient data",
     "LOW_QUALITY": "Signal quality too low to assess",
-    "NO_CLEAR_PERIODIC_PATTERN": "No clear periodic pattern",
+    "NO_CLEAR_PERIODIC_PATTERN": "Reading signal",
     "PERIODIC_PATTERN_OBSERVED": "Periodic RF pattern observed",
     "REVIEW_RECOMMENDED": "Periodic RF pattern sustained; further investigation recommended",
 }

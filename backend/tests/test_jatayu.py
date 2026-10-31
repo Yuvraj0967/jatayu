@@ -492,7 +492,7 @@ def test_output_stays_within_limits_on_arbitrary_signals(seed):
     assert 0.0 <= result["confidence"] <= 1.0
     assert all(0.0 <= value <= 1.0 for value in result["scores"].values())
     for rate in (result.get("bpm"), result.get("bpm_instant")):
-        assert rate is None or 6.0 <= rate <= 30.0
+        assert rate is None or 11.0 <= rate <= 30.0
 
 
 def test_simulated_script_stays_within_its_range():
@@ -565,7 +565,6 @@ def test_console_has_guidance_and_signal_lab():
         for needle in ("What to do next", "Setup checklist", "Signal lab", "/csi?embed=1", "Help and glossary", "Take the tour", "Simple", "Text size"):
             assert needle in home, needle
         lab = client.get("/csi?embed=1").text
-        assert "How to use this view" in lab and "Record empty room" in lab
 
 
 def test_key_7_drives_the_console_too():

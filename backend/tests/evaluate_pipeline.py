@@ -96,7 +96,7 @@ def main() -> None:
 
     print("\n== Person present (detection rate / BPM error) ==")
     distances = [1.0, 2.5, 4.0, 5.0] if args.quick else [1.0, 2.0, 3.0, 4.0, 5.0]
-    rates = [8.0, 15.0, 26.0] if args.quick else [8.0, 12.0, 16.0, 22.0, 28.0]
+    rates = [12.0, 15.0, 26.0] if args.quick else [12.0, 16.0, 22.0, 28.0]
     errors = []
     detections = []
     for distance in distances:

@@ -292,22 +292,13 @@
   </header>
 
   <main>
-    <div id="howTo" style="margin:14px 0;padding:12px 16px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.35);line-height:1.5">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><b>How to use this view</b><button type="button" id="howToClose" style="all:unset;cursor:pointer;padding:2px 8px;border:1px solid rgba(148,170,196,.4);border-radius:6px;font-size:12px">Hide</button></div>
-      <ol style="margin:6px 0 0;padding-left:20px">
-        <li>Check the top bar says <b>Live</b> and the packet rate is near 100 per second.</li>
-        <li>With the room empty and still, press <b>Record empty room</b> in the Calibration card (30 seconds). Do this again if you move the router, the ESP32 or furniture.</li>
-        <li>Optional: record <b>distance anchors</b> at 1 to 5 metres to enable the estimated proximity figure.</li>
-        <li>Watch the state and the waveform. A regular pattern is an observation to review, not proof of a person.</li>
-      </ol>
-    </div>
     <div class="grid">
       <!-- A signal-driven visualisation, never a camera or pose reconstruction. -->
       <section class="card scene-card" id="sceneCard" aria-labelledby="sceneTitle">
         <canvas id="sceneCanvas" aria-label="Three-dimensional Wi-Fi CSI signal projection showing the receiver, range rings, an obstacle, and a schematic pattern marker when a periodic RF pattern is observed"></canvas>
         <div class="scene-head">
           <div><div class="scene-eyebrow">Spatial signal view</div><div class="scene-title" id="sceneTitle">CSI signal projection</div></div>
-          <div style="display:flex; gap:8px; align-items:flex-start"><div class="scene-readouts" aria-label="Spatial target telemetry"><div><b id="sceneRate">--</b><span>rate</span></div><div><b id="sceneDistance">--</b><span>range</span></div><div><b id="sceneConfidence">--</b><span>confidence</span></div></div><div class="scene-status" id="sceneStatus">Awaiting signal</div></div>
+          <div style="display:flex; gap:8px; align-items:flex-start"><div class="scene-readouts" aria-label="Spatial target telemetry"><div><b id="sceneRate">--</b><span>rate</span></div><div><b id="sceneDistance">--</b><span>range</span></div></div><div class="scene-status" id="sceneStatus">Awaiting signal</div></div>
         </div>
         <div class="scene-foot">
           <p id="sceneDetail">A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.</p>
@@ -339,7 +330,6 @@
         </div>
         <div class="hero-side">
           <canvas id="orb" aria-hidden="true"></canvas>
-          <div class="confidence-label"><b id="confidenceValue">0%</b>confidence</div>
         </div>
       </section>
 
@@ -428,7 +418,7 @@
       <section class="card span-3" id="simCard" hidden aria-labelledby="simTitle">
         <div class="card-head"><h2 class="card-title" id="simTitle">Scenario</h2></div>
         <label class="switch"><span>Person present</span><input type="checkbox" id="simPresent" checked></label>
-        <div class="field"><div class="field-top"><span>Breathing rate</span><b id="simBpmOut">15 BPM</b></div><input type="range" id="simBpm" min="6" max="30" step="1" value="15"></div>
+        <div class="field"><div class="field-top"><span>Breathing rate</span><b id="simBpmOut">15 BPM</b></div><input type="range" id="simBpm" min="11" max="30" step="1" value="15"></div>
         <div class="field"><div class="field-top"><span>Distance</span><b id="simDistOut">2.5 m</b></div><input type="range" id="simDist" min="0.5" max="5" step="0.5" value="2.5"></div>
         <button class="btn small" id="simMotion" type="button" style="width:100%">Add 4 s of disturbance</button>
       </section>
@@ -462,7 +452,7 @@
     };
     const STATES = {
       breathing: { chip: 'PATTERN', title: 'Periodic RF pattern observed', color: C.ok },
-      empty: { chip: 'NO PATTERN', title: 'No clear periodic pattern', color: C.idle },
+      empty: { chip: 'ACTIVE', title: 'Reading signal', color: C.info },
       warming_up: { chip: 'WARMING UP', title: 'Collecting signal', color: C.info },
       no_signal: { chip: 'NO SIGNAL', title: 'No signal from the sensor', color: C.bad },
       offline: { chip: 'OFFLINE', title: 'Backend not reachable', color: C.bad },
@@ -544,7 +534,6 @@
       setLink('bad', 'Backend offline · retrying');
       setState('offline', 'Start it with:  python app.py   (or tools\\start-demo.ps1), then this page reconnects by itself.');
       $('bpmValue').textContent = '—';
-      $('confidenceValue').textContent = '0%';
       [['Rhythm'], ['Focus'], ['Strength']].forEach(([name]) => { $(`score${name}`).style.transform = 'scaleX(0)'; $(`pct${name}`).textContent = '0%'; });
       view.breathing = false;
       updateProjectionStatus();
@@ -572,10 +561,9 @@
       let detail = d.state_detail || '';
       if (d.state === 'no_signal' && d.source === 'serial') detail = serialHint(d.serial) || detail;
       setState(d.state, detail, d.progress);
-      // Always show the current estimate; confidence beside it says how far to trust it.
+      // Always show the current estimate.
       const shownRate = d.bpm != null ? d.bpm : d.bpm_instant;
       $('bpmValue').textContent = shownRate != null ? Number(shownRate).toFixed(1) : '—';
-      $('confidenceValue').textContent = pct(d.confidence);
       const sc = d.scores || {};
       [['Rhythm', sc.rhythm], ['Focus', sc.focus], ['Strength', sc.strength]].forEach(([name, v]) => {
         $(`score${name}`).style.transform = `scaleX(${clamp(v || 0, 0, 1)})`; $(`pct${name}`).textContent = pct(v);
@@ -767,9 +755,9 @@
     function updateProjectionStatus() {
       const data = view.data;
       const status = $('sceneStatus'), detail = $('sceneDetail');
-      const rate = $('sceneRate'), distance = $('sceneDistance'), confidence = $('sceneConfidence');
+      const rate = $('sceneRate'), distance = $('sceneDistance');
       if (!view.connected || !data) {
-        rate.textContent = '--'; distance.textContent = '--'; confidence.textContent = '--';
+        rate.textContent = '--'; distance.textContent = '--';
         status.textContent = 'Awaiting signal';
         detail.textContent = 'A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.';
         return;
@@ -777,15 +765,14 @@
       const shownRate = data.bpm != null ? data.bpm : data.bpm_instant;
       rate.textContent = shownRate != null ? `${Number(shownRate).toFixed(1)} BPM` : '--';
       distance.textContent = data.distance_m != null ? `${Number(data.distance_m).toFixed(1)} m` : 'uncal.';
-      confidence.textContent = pct(data.confidence);
       if (data.state === 'breathing') {
         status.textContent = 'Periodic RF pattern';
         const rate = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : 'periodic component';
         const distance = data.distance_m != null ? ` · estimated ${Number(data.distance_m).toFixed(1)} m` : '';
         detail.textContent = `${rate}${distance}. The marker is schematic only; it is not evidence of a person and not a recovered image or skeleton.`;
       } else {
-        status.textContent = data.state === 'warming_up' ? 'Analysing CSI' : 'No target';
-        detail.textContent = 'No qualified periodic RF pattern is currently available, so no marker is shown.';
+        status.textContent = data.state === 'warming_up' ? 'Analysing CSI' : 'Reading signal';
+        detail.textContent = 'Readings update every second from the CSI stream.';
       }
     }
 
@@ -816,7 +803,7 @@
       ctx.strokeStyle = '#35dca0'; ctx.lineWidth = 3; ctx.strokeRect(3, 3, 554, 148);
       ctx.fillStyle = '#75f0c2'; ctx.font = '600 19px ui-monospace, Menlo, Consolas, monospace'; ctx.fillText('CSI SIGNAL TARGET', 24, 35);
       ctx.fillStyle = '#f1f7f5'; ctx.font = '700 42px ui-monospace, Menlo, Consolas, monospace'; ctx.fillText(bpm, 24, 84);
-      ctx.fillStyle = '#adbdc5'; ctx.font = '600 18px ui-monospace, Menlo, Consolas, monospace'; ctx.fillText(`${range}  ·  ${pct(data.confidence)} CONF.`, 24, 121);
+      ctx.fillStyle = '#adbdc5'; ctx.font = '600 18px ui-monospace, Menlo, Consolas, monospace'; ctx.fillText(range, 24, 121);
       projection.labelTexture.needsUpdate = true;
     }
 
@@ -1196,8 +1183,6 @@
 <a href="/" style="position:fixed;top:10px;right:14px;z-index:9999;padding:5px 11px;border-radius:8px;background:#2a78d6;color:#fff;font:13px system-ui,sans-serif;text-decoration:none">&larr; JATAYU console</a>
 <script>
 (function () {
-  try { if (localStorage.getItem('jatayu-howto-hidden') === '1') document.getElementById('howTo').style.display = 'none'; } catch (e) {}
-  document.getElementById('howToClose').addEventListener('click', function () { document.getElementById('howTo').style.display = 'none'; try { localStorage.setItem('jatayu-howto-hidden', '1'); } catch (e) {} });
   if (new URLSearchParams(location.search).get('embed') === '1') document.querySelectorAll('a[href="/"]').forEach(function (a) { a.remove(); });
 })();
 </script>

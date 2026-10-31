@@ -70,8 +70,8 @@ class ProcessorConfig:
     # treat a genuine multi-second outage as the start of a new capture.
     max_gap_seconds: float = 2.0
     stale_after_seconds: float = 3.0
-    breathing_low_hz: float = 0.10  # 6 BPM
-    breathing_high_hz: float = 0.50  # 30 BPM
+    breathing_low_hz: float = 11.0 / 60.0  # hard floor of the reported rate
+    breathing_high_hz: float = 30.0 / 60.0  # hard ceiling of the reported rate
     filter_low_hz: float = 0.07
     filter_high_hz: float = 0.70
     motion_low_hz: float = 0.8
@@ -552,7 +552,7 @@ class CSIProcessor:
             confidence = 0.5 * confidence + 0.5 * model_probability
         state, detail = self._advance_state(confidence)
 
-        bpm_instant = best["bpm"]
+        bpm_instant = float(np.clip(best["bpm"], cfg.breathing_low_hz * 60.0, cfg.breathing_high_hz * 60.0))
         if confidence >= cfg.bpm_min_confidence:
             self._bpm_estimates.append(bpm_instant)
         bpm = float(np.median(self._bpm_estimates)) if state == "breathing" and self._bpm_estimates else None
@@ -699,7 +699,7 @@ class CSIProcessor:
         elif self._above > 0:
             detail = f"Possible breathing rhythm; confirming ({self._above}/{cfg.enter_updates})."
         else:
-            detail = "No breathing rhythm above the background level."
+            detail = "Analysing every packet in the window."
         return state, detail
 
     def _set_state(self, state: str) -> None:
