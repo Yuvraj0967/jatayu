@@ -28,7 +28,7 @@ python app.py --simulate        # everything is badged "simulated"
 python -m pytest tests          # needs: pip install pytest httpx
 ```
 
-Open `http://127.0.0.1:8000`. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
+Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment, incidents, timeline, commands, nodes). The original CSI view and calibration page is at `/csi`. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
 
 ## Live hardware
 

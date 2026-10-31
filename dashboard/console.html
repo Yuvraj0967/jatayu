@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JATAYU Console</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f6f4; --surface: #fcfcfb; --surface-2: #f0efec; --line: #e2e1dc; --line-2: #cfcec8;
+    --text: #0b0b0b; --text-2: #52514e; --text-3: #6b6a65;
+    --accent: #2a78d6; --accent-ink: #1c5cab; --accent-wash: #cde2fb;
+    --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --line: #2f2f2c; --line-2: #42423e;
+      --text: #f0efec; --text-2: #c3c2b7; --text-3: #9d9c93;
+      --accent: #3987e5; --accent-ink: #86b6ef; --accent-wash: #184f95;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --line: #2f2f2c; --line-2: #42423e;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #9d9c93;
+    --accent: #3987e5; --accent-ink: #86b6ef; --accent-wash: #184f95;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 48px; }
+  a { color: var(--accent-ink); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* top bar */
+  header.top { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .top-in { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  .brand { font-weight: 700; letter-spacing: .08em; font-size: 16px; }
+  .brand small { display: block; font-weight: 400; letter-spacing: 0; color: var(--text-3); font-size: 12px; }
+  .top-in nav { display: flex; gap: 14px; margin-left: 8px; }
+  .top-in nav a { text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; color: var(--text-2); }
+  .top-in nav a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+  .spacer { flex: 1; }
+  .btn { background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .btn.small { padding: 3px 9px; font-size: 12.5px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12px; background: var(--surface); white-space: nowrap; }
+  .badge.sim { background: var(--warn); border-color: var(--warn); color: #0b0b0b; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+
+  .banner { margin: 14px 0 0; padding: 9px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--text-2); font-size: 12.5px; }
+  .banner b { color: var(--text); }
+  .stale-bar { display: none; margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--crit); }
+  .stale-bar.on { display: block; }
+
+  /* tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); min-width: 0; }
+  .tile .lbl { color: var(--text-3); font-size: 12px; }
+  .tile .val { font-size: 18px; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+  .tile .sub { color: var(--text-2); font-size: 12px; margin-top: 2px; }
+
+  /* cards */
+  .grid { display: grid; gap: 14px; margin-top: 14px; grid-template-columns: repeat(12, 1fr); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .c6 { grid-column: span 6; } .c4 { grid-column: span 4; } .c8 { grid-column: span 8; } .c12 { grid-column: span 12; }
+  @media (max-width: 980px) { .c6, .c4, .c8 { grid-column: span 12; } }
+  .card h2 { font-size: 14px; margin: 0; font-weight: 650; }
+  .card .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .muted { color: var(--text-3); } .sec { color: var(--text-2); }
+  .note { font-size: 12px; color: var(--text-3); margin: 8px 0 0; }
+
+  /* state chip */
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; background: var(--surface-2); white-space: nowrap; }
+  .chip i { font-style: normal; width: 14px; text-align: center; }
+
+  /* kv */
+  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 10px 0 0; }
+  dl.kv dt { color: var(--text-3); } dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+  /* meters */
+  .meter { height: 8px; border-radius: 999px; background: var(--accent-wash); overflow: hidden; }
+  .meter > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+  /* chart */
+  .chart { position: relative; margin-top: 6px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); text-align: center; padding: 0 20px; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 9px; box-shadow: 0 4px 14px rgba(0,0,0,.15); font-size: 12px; z-index: 5; white-space: nowrap; display: none; }
+  .tip .v { font-size: 14px; font-weight: 650; }
+  .tip .k { display: inline-block; width: 12px; height: 2px; background: var(--accent); vertical-align: middle; margin-right: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--text-3); font-weight: 500; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { max-height: 260px; overflow: auto; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; }
+
+  /* lists */
+  .list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; }
+  .list li { border-bottom: 1px solid var(--line); }
+  .list li:last-child { border-bottom: 0; }
+  .list button.row { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 8px 6px; cursor: pointer; border-radius: 8px; }
+  .list button.row:hover { background: var(--surface-2); }
+  .list button.row[aria-current="true"] { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+  .list .l1 { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .list .code { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tl li { padding: 6px 4px; display: grid; grid-template-columns: 72px 1fr; gap: 8px; }
+  .tl .t { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tl .who { color: var(--text-3); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  input[type=text], input[type=number], textarea, select { background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 9px; width: 100%; }
+  textarea { min-height: 70px; resize: vertical; }
+  dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px; padding: 18px; width: min(440px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .toast { position: fixed; right: 16px; bottom: 16px; max-width: min(420px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--crit); border-radius: 10px; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.2); z-index: 50; display: none; }
+  .toast.on { display: block; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-width: 260px; }
+  .keys .btn { padding: 8px 0; text-align: center; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; }
+  @media (max-width: 980px) { .split { grid-template-columns: 1fr; } }
+  .small { font-size: 12.5px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (prefers-reduced-motion: no-preference) { .chart svg, .meter > span { transition: opacity .2s; } }
+  .dim { opacity: .55; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand">JATAYU<small>RF observation and incident coordination (experimental)</small></div>
+    <nav aria-label="Pages">
+      <a href="/" aria-current="page">Console</a>
+      <a href="/csi">CSI and calibration</a>
+    </nav>
+    <span class="spacer"></span>
+    <span id="srcBadge" class="badge" title="Where the data comes from"><span class="dot" style="background:var(--text-3)"></span>Connecting</span>
+    <span id="wsBadge" class="badge" title="Live feed"><span class="dot" style="background:var(--text-3)"></span><span>Feed: connecting</span></span>
+    <button class="btn" id="themeBtn" type="button" aria-label="Toggle light and dark theme">Theme</button>
+    <button class="btn primary" id="monBtn" type="button" disabled>Start monitoring</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="banner"><b>Read this first.</b> A periodic RF pattern is an observation for operator review, not proof of a person or of breathing. Gas readings are raw ADC counts from an uncalibrated MQ sensor, not a gas concentration and not evidence of a person. This is not a life-safety instrument.</p>
+  <div class="stale-bar" id="staleBar" role="alert"></div>
+
+  <section class="tiles" id="tiles" aria-label="System status"></section>
+
+  <div class="grid">
+    <!-- RF -->
+    <section class="card c6" aria-labelledby="rfH">
+      <div class="head"><h2 id="rfH">RF observation</h2><span id="rfChip"></span></div>
+      <div id="rfText" class="sec"></div>
+      <dl class="kv" id="rfKv"></dl>
+      <div class="chart" id="rfChart"></div>
+      <div class="head" style="margin:4px 0 0"><span class="note" style="margin:0" id="rfNote"></span><button class="btn small" id="rfTblBtn" type="button" aria-pressed="false">Table view</button></div>
+      <div id="rfTable" class="tablewrap" hidden></div>
+    </section>
+
+    <!-- Environment -->
+    <section class="card c6" aria-labelledby="envH">
+      <div class="head"><h2 id="envH">Environmental sensor (experimental)</h2><span id="envChip"></span></div>
+      <div id="envText" class="sec"></div>
+      <dl class="kv" id="envKv"></dl>
+      <div class="chart" id="envChart"></div>
+      <div class="head" style="margin:4px 0 0"><span class="note" style="margin:0" id="envNote"></span><span><button class="btn small" id="rebaseBtn" type="button">Re-baseline</button> <button class="btn small" id="envTblBtn" type="button" aria-pressed="false">Table view</button></span></div>
+      <div id="envTable" class="tablewrap" hidden></div>
+    </section>
+
+    <!-- Incidents -->
+    <section class="card c12" aria-labelledby="incH">
+      <div class="head">
+        <h2 id="incH">Incidents</h2>
+        <span class="actions" style="margin:0">
+          <button class="btn small" id="newIncBtn" type="button">New incident</button>
+          <button class="btn small" id="inspBtn" type="button">Request inspection</button>
+        </span>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list" id="incList" aria-label="Incident list"></ul>
+          <p class="note" id="incEmpty" hidden>No incidents yet. They open when monitoring is on and an observation is recorded, or when an operator opens one.</p>
+        </div>
+        <div id="incDetail" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="card c6" aria-labelledby="evH">
+      <div class="head"><h2 id="evH">Event timeline</h2>
+        <label class="small muted"><input type="checkbox" id="evSel"> Selected incident only</label></div>
+      <ul class="list tl" id="evList" aria-label="Events, newest first"></ul>
+    </section>
+
+    <!-- Commands -->
+    <section class="card c6" aria-labelledby="cmdH">
+      <div class="head"><h2 id="cmdH">Device commands</h2><span class="muted small">created, sent, received, executed, acknowledged</span></div>
+      <div class="tablewrap" style="max-height:360px"><table><thead><tr><th>Time</th><th>Command</th><th>State</th><th>Detail</th></tr></thead><tbody id="cmdBody"></tbody></table></div>
+      <p class="note" id="cmdEmpty" hidden>No commands yet. Requesting an inspection sends one to the Arduino's LCD.</p>
+    </section>
+
+    <!-- Nodes -->
+    <section class="card c8" aria-labelledby="nodeH">
+      <div class="head"><h2 id="nodeH">Sensor nodes</h2><span class="muted small">deployment metadata, groundwork for multi-node work</span></div>
+      <div class="tablewrap" style="max-height:none"><table><thead><tr><th>Node</th><th>Role</th><th class="num">x (m)</th><th class="num">y (m)</th><th class="num">z (m)</th><th class="num">Heading (deg)</th><th>Antenna</th><th>Last seen</th><th></th></tr></thead><tbody id="nodeBody"></tbody></table></div>
+      <p class="note" id="nodeEmpty" hidden>No node has reported yet.</p>
+    </section>
+
+    <!-- Physical -->
+    <section class="card c4" aria-labelledby="phyH">
+      <div class="head"><h2 id="phyH">Physical controls</h2></div>
+      <dl class="kv" id="phyKv"></dl>
+      <div id="simBox" hidden>
+        <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+        <div class="small" style="font-weight:600">Simulation controls</div>
+        <p class="note" style="margin:2px 0 8px">These act on simulated devices only.</p>
+        <div class="keys" id="simKeys"></div>
+        <div class="field"><label for="gasOff" class="small">Gas offset: <b id="gasOffV">0</b> counts</label>
+          <input type="range" id="gasOff" min="-300" max="700" step="10" value="0"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<dialog id="dlgNew"><form method="dialog" id="fNew">
+  <h2 style="margin-top:0">New incident</h2>
+  <div class="field"><label for="newSum">Summary (3 to 200 characters)</label><input type="text" id="newSum" maxlength="200" required minlength="3"></div>
+  <div class="actions" style="justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Open incident</button></div>
+</form></dialog>
+<dialog id="dlgInsp"><form method="dialog" id="fInsp">
+  <h2 style="margin-top:0">Request inspection</h2>
+  <p class="note" style="margin-top:0">Creates or joins an incident and sends a message to the Arduino LCD. The command's state is tracked below.</p>
+  <div class="field"><label for="inspNotes">Notes (optional, up to 500 characters)</label><textarea id="inspNotes" maxlength="500"></textarea></div>
+  <div class="actions" style="justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Send request</button></div>
+</form></dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ---------- helpers ---------- */
+const $ = (id) => document.getElementById(id);
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
+const fmtTime = (t) => t ? new Date(t * 1000).toLocaleTimeString([], { hour12: false }) : '--';
+const fmtDT = (t) => t ? new Date(t * 1000).toLocaleString([], { hour12: false }) : '--';
+const ago = (s) => s == null ? '--' : s < 60 ? `${Math.round(s)} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${(s / 3600).toFixed(1)} h ago`;
+const pretty = (s) => { s = String(s || '').replace(/_/g, ' ').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+const num = (v, d = 1) => (v == null || Number.isNaN(Number(v))) ? '--' : Number(v).toFixed(d);
+const pct = (v) => v == null ? '--' : `${(Number(v) * 100).toFixed(1)}%`;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 6000); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let data = null; try { data = await r.json(); } catch (_) {}
+  if (!r.ok) throw new Error((data && data.detail) || `${r.status} ${r.statusText}`);
+  return data;
+}
+const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+/* ---------- state chips: icon + label, never colour alone ---------- */
+const RF_STYLE = {
+  NO_DATA: ['○', 'var(--text-3)'], COLLECTING: ['◔', 'var(--accent)'], INSUFFICIENT_DATA: ['◑', 'var(--text-3)'],
+  LOW_QUALITY: ['▲', 'var(--serious)'], NO_CLEAR_PERIODIC_PATTERN: ['●', 'var(--text-3)'],
+  PERIODIC_PATTERN_OBSERVED: ['◆', 'var(--accent)'], REVIEW_RECOMMENDED: ['◆', 'var(--warn)'],
+};
+const INC_STYLE = { open: ['●', 'var(--warn)', 'Open'], acknowledged: ['✓', 'var(--accent)', 'Acknowledged'], closed: ['■', 'var(--text-3)', 'Closed'] };
+const CMD_STYLE = {
+  created: ['○', 'var(--text-3)'], sent: ['◔', 'var(--accent)'], received: ['◑', 'var(--accent)'],
+  executed: ['●', 'var(--accent)'], acknowledged: ['✓', 'var(--good)'], failed: ['✕', 'var(--crit)'], timed_out: ['▲', 'var(--serious)'],
+};
+function chip(icon, color, label) { return h('span', { class: 'chip' }, h('i', { style: `color:${color}`, 'aria-hidden': 'true', text: icon }), label); }
+const ENV_STYLE = { NORMAL: ['●', 'var(--text-3)', 'Normal'], ELEVATED: ['▲', 'var(--warn)', 'Elevated'], WARMING_UP: ['◔', 'var(--accent)', 'Warming up'],
+  BASELINING: ['◑', 'var(--accent)', 'Baselining'], STALE: ['▲', 'var(--serious)', 'Stale'], NO_DATA: ['○', 'var(--text-3)', 'No data'] };
+
+/* ---------- charts: hand-drawn SVG, 2px line, ringed end dot, crosshair + tooltip ---------- */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs) { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); return e; }
+function niceStep(range, ticks) {
+  const raw = range / ticks, mag = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+}
+function lineChart(host, cfg) {
+  /* cfg: points[{t,v,lines:[...]}], name, unit, yMin?, yMax?, refs[{v,label}], fmt(v), emptyText, label */
+  clear(host);
+  const pts = cfg.points || [];
+  if (pts.length < 2) { host.style.minHeight = '120px'; host.append(h('div', { class: 'empty', text: cfg.emptyText || 'No data yet.' })); return; }
+  host.style.minHeight = '';
+  const W = Math.max(280, host.clientWidth || 600), H = 210, m = { l: 46, r: 64, t: 12, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+  let lo = cfg.yMin != null ? cfg.yMin : Math.min(...pts.map(p => p.v), ...(cfg.refs || []).map(r => r.v));
+  let hi = cfg.yMax != null ? cfg.yMax : Math.max(...pts.map(p => p.v), ...(cfg.refs || []).map(r => r.v));
+  if (cfg.yMin == null) { const pad = (hi - lo) * 0.15 || 1; lo -= pad; hi += pad; }
+  if (hi === lo) hi = lo + 1;
+  const step = niceStep(hi - lo, 4); lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const X = (t) => m.l + ((t - t0) / Math.max(1e-9, t1 - t0)) * iw, Y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * ih;
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': cfg.label || cfg.name, tabindex: '0' });
+  for (let v = lo; v <= hi + 1e-9; v += step) {
+    svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }));
+    const tx = s('text', { x: m.l - 8, y: Y(v) + 4, 'text-anchor': 'end', fill: 'var(--text-3)', 'font-size': 11 }); tx.textContent = (cfg.fmt || String)(Math.round(v * 1000) / 1000); svg.append(tx);
+  }
+  const nt = W < 420 ? 1 : 3;
+  for (let i = 0; i <= nt; i++) { const t = t0 + (t1 - t0) * i / nt, tx = s('text', { x: X(t), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === nt ? 'end' : 'middle', fill: 'var(--text-3)', 'font-size': 11 }); tx.textContent = fmtTime(t); svg.append(tx); }
+  for (const r of cfg.refs || []) {
+    if (r.v == null || r.v < lo || r.v > hi) continue;
+    svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(r.v), y2: Y(r.v), stroke: 'var(--text-3)', 'stroke-width': 1, 'stroke-dasharray': '0' }));
+    const tx = s('text', { x: W - m.r + 6, y: Y(r.v) + 4, fill: 'var(--text-2)', 'font-size': 11 }); tx.textContent = r.label; svg.append(tx);
+  }
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.v).toFixed(1)}`).join('');
+  svg.append(s('path', { d: `${path}L${X(t1).toFixed(1)},${Y(lo)}L${X(t0).toFixed(1)},${Y(lo)}Z`, fill: 'var(--accent)', opacity: '0.10' }));
+  svg.append(s('path', { d: path, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  const last = pts[pts.length - 1];
+  svg.append(s('circle', { cx: X(last.t), cy: Y(last.v), r: 4, fill: 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+  const lt = s('text', { x: Math.min(W - 4, X(last.t) + 8), y: Y(last.v) - 8, 'text-anchor': 'start', fill: 'var(--text)', 'font-size': 12, 'font-weight': 600 }); lt.textContent = (cfg.fmt || String)(last.v);
+  lt.setAttribute('x', Math.min(W - m.r + 6, X(last.t) + 8)); svg.append(lt);
+  const cross = s('line', { y1: m.t, y2: H - m.b, stroke: 'var(--text-3)', 'stroke-width': 1, visibility: 'hidden' }); svg.append(cross);
+  const hit = s('circle', { r: 4, fill: 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' }); svg.append(hit);
+  const tip = h('div', { class: 'tip' }); host.append(svg, tip);
+  let idx = pts.length - 1;
+  function show(i, clientX) {
+    idx = Math.max(0, Math.min(pts.length - 1, i)); const p = pts[idx];
+    cross.setAttribute('x1', X(p.t)); cross.setAttribute('x2', X(p.t)); cross.setAttribute('visibility', 'visible');
+    hit.setAttribute('cx', X(p.t)); hit.setAttribute('cy', Y(p.v)); hit.setAttribute('visibility', 'visible');
+    clear(tip).append(h('div', { class: 'v' }, h('span', { class: 'k' }), (cfg.fmt || String)(p.v), cfg.unit ? ` ${cfg.unit}` : ''),
+      h('div', { class: 'muted' }, cfg.name, ' · ', fmtTime(p.t)), ...(p.lines || []).map(l => h('div', { class: 'sec', text: l })));
+    tip.style.display = 'block';
+    const box = host.getBoundingClientRect(), px = (X(p.t) / W) * box.width;
+    tip.style.left = Math.max(0, Math.min(box.width - tip.offsetWidth, px + 12)) + 'px'; tip.style.top = '4px';
+  }
+  function hide() { cross.setAttribute('visibility', 'hidden'); hit.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; }
+  svg.addEventListener('pointermove', (e) => {
+    const box = svg.getBoundingClientRect(), x = ((e.clientX - box.left) / box.width) * W;
+    let best = 0, bd = 1e9; pts.forEach((p, i) => { const d = Math.abs(X(p.t) - x); if (d < bd) { bd = d; best = i; } }); show(best);
+  });
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('blur', hide);
+  svg.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') { show(idx - 1); e.preventDefault(); } else if (e.key === 'ArrowRight') { show(idx + 1); e.preventDefault(); } else if (e.key === 'Escape') hide(); });
+}
+function dataTable(host, cols, rows) {
+  clear(host);
+  host.append(h('table', {}, h('thead', {}, h('tr', {}, cols.map(c => h('th', { class: c.num ? 'num' : '', text: c.h })))),
+    h('tbody', {}, rows.map(r => h('tr', {}, cols.map(c => h('td', { class: c.num ? 'num' : '', text: c.f(r) })))))));
+}
+
+/* ---------- state ---------- */
+const S = { status: null, incidents: [], selected: null, detail: null, events: [], commands: [], nodes: [], rfHist: [], gasHist: [], ws: 'connecting', lastSnap: 0, editNode: null };
+
+/* ---------- renderers ---------- */
+function renderTop() {
+  const st = S.status; if (!st) return;
+  const sim = st.source === 'simulated';
+  const sb = clear($('srcBadge')); sb.className = 'badge' + (sim ? ' sim' : '');
+  sb.append(sim ? 'SIMULATED DATA' : h('span', { class: 'dot', style: 'background:var(--good)' }), sim ? '' : 'Live hardware');
+  const wb = clear($('wsBadge')), wc = S.ws === 'open' ? 'var(--good)' : S.ws === 'connecting' ? 'var(--accent)' : 'var(--crit)';
+  wb.append(h('span', { class: 'dot', style: `background:${wc}` }), `Feed: ${S.ws === 'open' ? 'live' : S.ws === 'connecting' ? 'connecting' : 'lost, polling'}`);
+  const mb = $('monBtn'); mb.disabled = false; mb.textContent = st.monitoring ? 'Stop monitoring' : 'Start monitoring'; mb.className = 'btn ' + (st.monitoring ? '' : 'primary');
+  $('simBox').hidden = !sim;
+  const age = (Date.now() / 1000) - S.lastSnap, bar = $('staleBar');
+  if (S.lastSnap && age > 6) { bar.className = 'stale-bar on'; bar.textContent = `No update from the backend for ${Math.round(age)} s. Values below are stale, not current.`; }
+  else bar.className = 'stale-bar';
+  document.body.classList.toggle('stale', S.lastSnap && age > 6);
+}
+function tile(label, value, sub, icon, color) {
+  return h('div', { class: 'tile' }, h('div', { class: 'lbl', text: label }),
+    h('div', { class: 'val' }, icon ? h('span', { 'aria-hidden': 'true', style: `color:${color};margin-right:6px`, text: icon }) : null, value), h('div', { class: 'sub', text: sub || '' }));
+}
+function renderTiles() {
+  const st = S.status; if (!st) return; const T = clear($('tiles'));
+  const dev = st.devices || {}, rf = st.rf || {}, env = st.environment || {}, c = st.incident_counts || {};
+  const on = (v) => v === 'online';
+  const csi = st.csi_link || {};
+  T.append(
+    tile('Monitoring', st.monitoring ? 'On' : 'Off', st.monitoring ? 'Incidents can open' : 'Observations are not grouped into incidents', st.monitoring ? '●' : '○', st.monitoring ? 'var(--accent)' : 'var(--text-3)'),
+    tile('ESP32 CSI node', on(dev.esp32) ? 'Online' : 'Offline', on(dev.esp32) ? `${num(csi.packet_rate_hz || (rf.features || {}).packet_rate_hz, 0)} packets/s` : 'No CSI stream', on(dev.esp32) ? '●' : '○', on(dev.esp32) ? 'var(--good)' : 'var(--text-3)'),
+    tile('Arduino Mega', on(dev.arduino) ? 'Online' : 'Offline', on(dev.arduino) ? 'Receiving readings' : 'No messages', on(dev.arduino) ? '●' : '○', on(dev.arduino) ? 'var(--good)' : 'var(--text-3)'),
+    tile('RF state', pretty(rf.state), rf.text || '', (RF_STYLE[rf.state] || ['', ''])[0], (RF_STYLE[rf.state] || ['', ''])[1]),
+    tile('Environment', (ENV_STYLE[env.status] || [0, 0, pretty(env.status)])[2], env.raw_adc != null ? `${env.raw_adc} ADC counts` : 'No reading', (ENV_STYLE[env.status] || [''])[0], (ENV_STYLE[env.status] || ['', ''])[1]),
+    tile('Active incidents', String((c.open || 0) + (c.acknowledged || 0)), `${c.open || 0} open, ${c.acknowledged || 0} acknowledged, ${c.closed || 0} closed`),
+  );
+}
+function renderRF() {
+  const st = S.status; if (!st) return; const rf = st.rf || {}, f = rf.features || {}, [ic, col] = RF_STYLE[rf.state] || ['', 'var(--text-3)'];
+  clear($('rfChip')).append(chip(ic, col, pretty(rf.state)));
+  $('rfText').textContent = rf.text || '';
+  const csi = st.csi_link || {}, seq = csi.sequence || {};
+  const kv = clear($('rfKv'));
+  const add = (k, v) => kv.append(h('dt', { text: k }), h('dd', {}, v));
+  add('Data quality', rf.data_quality ? pretty(rf.data_quality) : '--');
+  add('Confidence', rf.confidence || '--');
+  add('Periodicity score', rf.periodicity_score != null ? num(rf.periodicity_score, 2) : '--');
+  add('Pattern held for', rf.pattern_seconds ? `${num(rf.pattern_seconds, 0)} s (review at 20 s)` : '--');
+  add('Candidate rate', f.dominant_rate_per_min != null ? `${num(f.dominant_rate_per_min, 1)} cycles/min (a candidate, not a breathing rate)` : '--');
+  add('Packet rate', f.packet_rate_hz != null ? `${num(f.packet_rate_hz, 0)} per second` : '--');
+  add('Packet loss', seq.received ? `${pct(seq.loss_ratio)} (${seq.lost} lost of ${seq.received + seq.lost})` : 'not measured');
+  add('RSSI', f.rssi != null ? `${num(f.rssi, 0)} dBm` : '--');
+  const pts = S.rfHist.map(r => ({ t: r.recorded_at, v: r.periodicity_score || 0, lines: [`State: ${pretty(r.pattern_state)}`, `Quality: ${pretty(r.signal_quality)}, confidence: ${r.confidence}`] }));
+  lineChart($('rfChart'), { points: pts, name: 'Periodicity score', yMin: 0, yMax: 1, fmt: (v) => num(v, 1), label: 'Periodicity score over time', emptyText: 'No RF observations recorded yet.' });
+  $('rfNote').textContent = pts.length ? `Periodicity score (0 to 1) over recent observations. High means regular, not that a person is present. Last stored ${ago((Date.now() / 1000) - pts[pts.length - 1].t)}.` : '';
+  if (!$('rfTable').hidden) dataTable($('rfTable'), [{ h: 'Time', f: r => fmtTime(r.recorded_at) }, { h: 'State', f: r => pretty(r.pattern_state) }, { h: 'Quality', f: r => pretty(r.signal_quality) }, { h: 'Confidence', f: r => r.confidence }, { h: 'Score', num: 1, f: r => num(r.periodicity_score, 2) }], S.rfHist.slice(-40).reverse());
+}
+function renderEnv() {
+  const st = S.status; if (!st) return; const e = st.environment || {}, [ic, col, lab] = ENV_STYLE[e.status] || ['', 'var(--text-3)', pretty(e.status)];
+  clear($('envChip')).append(chip(ic, col, lab));
+  $('envText').textContent = e.disclaimer || 'Experimental raw ADC reading. Not a calibrated or certified gas concentration.';
+  const kv = clear($('envKv')); const add = (k, v) => kv.append(h('dt', { text: k }), h('dd', {}, v));
+  add('Raw reading', e.raw_adc != null ? `${e.raw_adc} ADC counts (10-bit, 0 to 1023)` : 'no reading yet');
+  add('Baseline', e.baseline_adc != null ? `${num(e.baseline_adc, 0)} counts` : (e.status === 'WARMING_UP' ? `measuring after warm-up (${num(e.warmup_remaining_s, 0)} s left)` : '--'));
+  add('Elevated above', e.threshold_adc != null ? `${num(e.threshold_adc, 0)} counts` : '--');
+  add('Sensor model', e.model || 'UNKNOWN'); add('Calibration', pretty(e.calibration || 'NOT_CALIBRATED'));
+  add('Last reading', e.age_s != null ? ago(e.age_s) : 'never');
+  const refs = []; if (e.baseline_adc != null) refs.push({ v: e.baseline_adc, label: 'baseline' }); if (e.threshold_adc != null) refs.push({ v: e.threshold_adc, label: 'elevated' });
+  const pts = S.gasHist.map(r => ({ t: r.recorded_at, v: r.raw_value, lines: [`Source: ${r.source}`, `Quality: ${pretty(r.quality_status)}`] }));
+  lineChart($('envChart'), { points: pts, name: 'Raw ADC', unit: 'counts', refs, refsOnly: false, fmt: (v) => String(Math.round(v)), label: 'Raw gas sensor ADC counts over time', emptyText: 'No sensor readings yet. Is the Arduino connected?' });
+  $('envNote').textContent = pts.length ? 'Raw counts, not ppm. The sensor needs warm-up and its own calibration before any reading means anything.' : '';
+  if (!$('envTable').hidden) dataTable($('envTable'), [{ h: 'Time', f: r => fmtTime(r.recorded_at) }, { h: 'Raw counts', num: 1, f: r => String(Math.round(r.raw_value)) }, { h: 'Quality', f: r => pretty(r.quality_status) }, { h: 'Source', f: r => r.source }], S.gasHist.slice(-40).reverse());
+}
+function renderIncidents() {
+  const L = clear($('incList')); $('incEmpty').hidden = S.incidents.length > 0;
+  for (const i of S.incidents) {
+    const [ic, col, lab] = INC_STYLE[i.status] || ['', '', i.status];
+    L.append(h('li', {}, h('button', { class: 'row', type: 'button', 'aria-current': String(i.id === S.selected), onclick: () => selectIncident(i.id) },
+      h('div', { class: 'l1' }, h('span', { class: 'code', text: i.incident_code }), chip(ic, col, lab)),
+      h('div', { class: 'sec', text: i.summary }),
+      h('div', { class: 'muted small', text: `Updated ${fmtDT(i.updated_at)}${i.source === 'simulated' ? ' · simulated' : ''}` }))));
+  }
+}
+function renderDetail() {
+  const D = clear($('incDetail')), d = S.detail;
+  if (!d) { D.append(h('p', { class: 'muted', text: S.incidents.length ? 'Select an incident to review its evidence, add notes and acknowledge it.' : '' })); return; }
+  const [ic, col, lab] = INC_STYLE[d.status] || ['', '', d.status];
+  D.append(h('div', { class: 'l1', style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center' }, h('h3', { style: 'margin:0;font-size:15px', text: d.incident_code }), chip(ic, col, lab)),
+    h('p', { class: 'sec', style: 'margin:4px 0', text: d.summary }),
+    h('p', { class: 'muted small', style: 'margin:0', text: `Opened ${fmtDT(d.created_at)}${d.source === 'simulated' ? ' · simulated data' : ''}` }));
+  const acts = h('div', { class: 'actions' });
+  acts.append(h('button', { class: 'btn small', type: 'button', disabled: d.status === 'closed', onclick: () => ackIncident(d.id) }, d.status === 'acknowledged' ? 'Acknowledge again' : 'Acknowledge'),
+    h('button', { class: 'btn small', type: 'button', disabled: d.status !== 'acknowledged', title: d.status === 'acknowledged' ? '' : 'An operator must acknowledge the incident before it can be closed', onclick: () => closeIncident(d.id) }, 'Close incident'));
+  D.append(acts);
+  D.append(h('div', { style: 'font-weight:600;margin-top:6px', text: 'Evidence' }));
+  const ev = h('ul', { class: 'list', style: 'max-height:200px' });
+  if (!d.observations.length) ev.append(h('li', { class: 'muted', style: 'padding:6px', text: 'None recorded.' }));
+  for (const o of d.observations) ev.append(h('li', { style: 'padding:6px 2px' }, h('div', {}, h('b', { text: pretty(o.observation_type) }), h('span', { class: 'muted', text: `  ${fmtTime(o.created_at)}` })), detailLine(o)));
+  D.append(ev);
+  if (d.acknowledgements.length) {
+    D.append(h('div', { style: 'font-weight:600;margin-top:8px', text: 'Acknowledgements' }),
+      h('ul', { class: 'list', style: 'max-height:120px' }, d.acknowledgements.map(a => h('li', { style: 'padding:4px 2px' }, `${fmtDT(a.acknowledged_at)} · via ${a.channel}${a.notes ? ` · ${a.notes}` : ''}`))));
+  }
+  if (d.status !== 'closed') {
+    const ta = h('textarea', { id: 'noteText', maxlength: '500', 'aria-label': 'Operator note', placeholder: 'Add an operator note (up to 500 characters)' });
+    D.append(h('div', { class: 'field' }, ta, h('div', {}, h('button', { class: 'btn small', type: 'button', onclick: async () => { const text = ta.value.trim(); if (!text) return; try { await post(`/api/incidents/${d.id}/notes`, { text }); ta.value = ''; await refreshAll(); } catch (e) { toast(e.message); } } }, 'Add note'))));
+  }
+}
+function detailLine(o) {
+  const d = o.detail || {}, bits = [];
+  if (d.text) bits.push(d.text); if (d.summary) bits.push(d.summary); if (d.notes) bits.push(`Notes: ${d.notes}`);
+  if (d.confidence) bits.push(`Confidence: ${d.confidence}`); if (d.raw_adc != null) bits.push(`${d.raw_adc} ADC counts (baseline ${d.baseline != null ? num(d.baseline, 0) : '--'})`);
+  if (d.packet_rate_hz != null) bits.push(`${num(d.packet_rate_hz, 0)} packets/s`); if (d.note) bits.push(d.note);
+  return h('div', { class: 'sec small', text: bits.join(' · ') || '' });
+}
+function renderEvents() {
+  const L = clear($('evList')); let evs = S.events.slice();
+  if ($('evSel').checked && S.selected != null) evs = evs.filter(e => e.incident_id === S.selected);
+  if (!evs.length) L.append(h('li', { class: 'muted', style: 'display:block' }, 'No events yet.'));
+  for (const e of evs.slice(-80).reverse()) {
+    const p = e.payload || {}, bits = [];
+    for (const k of ['label', 'text', 'notes', 'command_id', 'code', 'key', 'action', 'to', 'raw_adc', 'reason']) if (p[k] != null && p[k] !== '') bits.push(k === 'to' ? `now ${pretty(p[k])}` : String(p[k]));
+    L.append(h('li', {}, h('span', { class: 't', text: fmtTime(e.created_at) }), h('span', {}, h('b', { text: pretty(e.event_type) }), h('span', { class: 'who', text: `  ${e.actor}${p.source === 'simulated' ? ' · simulated' : ''}` }), bits.length ? h('div', { class: 'sec small', text: bits.join(' · ') }) : null)));
+  }
+}
+function renderCommands() {
+  const B = clear($('cmdBody')); $('cmdEmpty').hidden = S.commands.length > 0;
+  for (const c of S.commands.slice(0, 30)) {
+    const [ic, col] = CMD_STYLE[c.state] || ['', ''];
+    const args = c.args && c.args.line1 ? `"${c.args.line1}" / "${c.args.line2 || ''}"` : '';
+    B.append(h('tr', {}, h('td', { text: fmtTime(c.created_at) }), h('td', {}, h('div', { text: c.name }), h('div', { class: 'muted small', text: c.id })), h('td', {}, chip(ic, col, pretty(c.state))), h('td', { class: 'sec small', text: c.failure || args })));
+  }
+}
+function renderNodes() {
+  const B = clear($('nodeBody')); $('nodeEmpty').hidden = S.nodes.length > 0;
+  for (const n of S.nodes) {
+    const cells = (v, d) => v == null ? '--' : num(v, d);
+    if (S.editNode === n.node_id) {
+      const fld = (id, val, w) => h('input', { type: id === 'ant' ? 'text' : 'number', step: 'any', id: `ne_${id}`, value: val == null ? '' : val, style: `width:${w}px`, 'aria-label': id });
+      B.append(h('tr', {}, h('td', { text: n.node_id }), h('td', { text: n.role }), h('td', { class: 'num' }, fld('x', n.x_m, 70)), h('td', { class: 'num' }, fld('y', n.y_m, 70)), h('td', { class: 'num' }, fld('z', n.z_m, 70)), h('td', { class: 'num' }, fld('h', n.orientation_deg, 70)), h('td', {}, fld('ant', n.antenna, 90)), h('td', { text: ago(S.status ? S.status.server_time - n.last_seen_at : null) }),
+        h('td', {}, h('button', { class: 'btn small primary', type: 'button', onclick: () => saveNode(n.node_id) }, 'Save'), ' ', h('button', { class: 'btn small', type: 'button', onclick: () => { S.editNode = null; renderNodes(); } }, 'Cancel'))));
+    } else {
+      B.append(h('tr', {}, h('td', {}, n.node_id, n.source === 'simulated' ? h('span', { class: 'muted', text: ' (simulated)' }) : null), h('td', { text: n.role }), h('td', { class: 'num', text: cells(n.x_m, 2) }), h('td', { class: 'num', text: cells(n.y_m, 2) }), h('td', { class: 'num', text: cells(n.z_m, 2) }), h('td', { class: 'num', text: cells(n.orientation_deg, 0) }), h('td', { text: n.antenna || '--' }),
+        h('td', { text: ago(S.status ? S.status.server_time - n.last_seen_at : null) }), h('td', {}, h('button', { class: 'btn small', type: 'button', onclick: () => { S.editNode = n.node_id; renderNodes(); } }, 'Edit'))));
+    }
+  }
+}
+function renderPhysical() {
+  const st = S.status; if (!st) return; const kv = clear($('phyKv')); const add = (k, v) => kv.append(h('dt', { text: k }), h('dd', {}, v));
+  const k = st.last_key; add('Last key', k ? `${k.key}  (${pretty(k.action)}) at ${fmtTime(k.at)}` : 'none yet');
+  add('LCD page', pretty(st.lcd_page));
+  const al = st.arduino_link || {}; add('Arduino link', al.kind === 'simulation' ? 'simulated' : `${pretty(al.state || 'unknown')}${al.port ? ` on ${al.port}` : ''}`);
+  if (al.messages_rejected) add('Rejected lines', `${al.messages_rejected} (last: ${al.last_rejected || '--'})`);
+  add('Backend cycle', st.performance ? `${st.performance.tick_ms} ms` : '--');
+  const cl = st.csi_link || {}; if (cl.error) add('ESP32 link', cl.error); else if (cl.state) add('ESP32 link', `${pretty(cl.state)}${cl.port ? ` on ${cl.port}` : ''}`);
+}
+function renderAll() { renderTop(); renderTiles(); renderRF(); renderEnv(); renderIncidents(); renderDetail(); renderEvents(); renderCommands(); renderNodes(); renderPhysical(); }
+
+/* ---------- actions ---------- */
+async function selectIncident(id) { S.selected = id; try { S.detail = await api(`/api/incidents/${id}`); } catch (e) { S.detail = null; toast(e.message); } renderIncidents(); renderDetail(); renderEvents(); }
+async function ackIncident(id) { try { await post(`/api/incidents/${id}/acknowledge`, {}); await refreshAll(); } catch (e) { toast(e.message); } }
+async function closeIncident(id) { try { await post(`/api/incidents/${id}/close`, {}); await refreshAll(); } catch (e) { toast(e.message); } }
+async function saveNode(id) {
+  const g = (k) => $(`ne_${k}`).value.trim(), body = {};
+  for (const [k, f] of [['x', 'x_m'], ['y', 'y_m'], ['z', 'z_m'], ['h', 'orientation_deg']]) { if (g(k) !== '') { const v = Number(g(k)); if (!Number.isFinite(v)) return toast(`${f} must be a number`); body[f] = v; } }
+  if (g('ant') !== '') body.antenna = g('ant');
+  if (!Object.keys(body).length) { S.editNode = null; return renderNodes(); }
+  try { await api(`/api/nodes/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); S.editNode = null; await refreshAll(); } catch (e) { toast(e.message); }
+}
+$('monBtn').addEventListener('click', async () => { try { await post(S.status.monitoring ? '/api/monitoring/stop' : '/api/monitoring/start'); await refreshStatus(); } catch (e) { toast(e.message); } });
+$('newIncBtn').addEventListener('click', () => { $('newSum').value = ''; $('dlgNew').showModal(); $('newSum').focus(); });
+$('fNew').addEventListener('submit', async (e) => { if (e.submitter && e.submitter.value === 'ok') { const summary = $('newSum').value.trim(); try { const d = await post('/api/incidents', { summary }); await refreshAll(); await selectIncident(d.id); } catch (er) { toast(er.message); } } });
+$('inspBtn').addEventListener('click', () => { $('inspNotes').value = ''; $('dlgInsp').showModal(); });
+$('fInsp').addEventListener('submit', async (e) => { if (e.submitter && e.submitter.value === 'ok') { const notes = $('inspNotes').value.trim(); try { const r = await post('/api/inspection/request', notes ? { notes } : {}); await refreshAll(); await selectIncident(r.incident_id); } catch (er) { toast(er.message); } } });
+$('rebaseBtn').addEventListener('click', async () => { try { await post('/api/sensors/rebaseline'); toast('Re-baselining: the sensor will be re-measured after warm-up.'); await refreshStatus(); } catch (e) { toast(e.message); } });
+for (const [btn, box, fn] of [['rfTblBtn', 'rfTable', renderRF], ['envTblBtn', 'envTable', renderEnv]]) $(btn).addEventListener('click', () => { const on = $(box).hidden; $(box).hidden = !on; $(btn).setAttribute('aria-pressed', String(on)); $(btn).textContent = on ? 'Hide table' : 'Table view'; fn(); });
+$('evSel').addEventListener('change', renderEvents);
+for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '*', '#']) $('simKeys').append(h('button', { class: 'btn', type: 'button', title: 'Simulated keypad press', onclick: async () => { try { await post('/api/simulate/key', { key: k }); } catch (e) { toast(e.message); } } }, k));
+let gasT; $('gasOff').addEventListener('input', (e) => { $('gasOffV').textContent = e.target.value; clearTimeout(gasT); gasT = setTimeout(async () => { try { await post('/api/simulate/gas', { offset: Number(e.target.value) }); } catch (er) { toast(er.message); } }, 250); });
+$('themeBtn').addEventListener('click', () => { const cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); const next = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', next); try { localStorage.setItem('jatayu-theme', next); } catch (_) {} renderRF(); renderEnv(); });
+try { const t = localStorage.getItem('jatayu-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (_) {}
+
+/* ---------- data ---------- */
+async function refreshStatus() { try { S.status = await api('/api/status'); S.lastSnap = Date.now() / 1000; renderTop(); renderTiles(); renderRF(); renderEnv(); renderPhysical(); } catch (e) { renderTop(); } }
+async function refreshLists() {
+  try {
+    const [inc, cmds, nodes, evs] = await Promise.all([api('/api/incidents?limit=60'), api('/api/commands'), api('/api/nodes'), api('/api/events?limit=120')]);
+    S.incidents = inc; S.commands = cmds; S.nodes = nodes; S.events = evs;
+    if (S.selected != null) { try { S.detail = await api(`/api/incidents/${S.selected}`); } catch (_) { S.detail = null; } }
+    if (S.editNode == null) renderNodes();
+    renderIncidents(); renderDetail(); renderEvents(); renderCommands(); renderTiles();
+  } catch (e) { /* shown by stale bar */ }
+}
+async function refreshSeries() {
+  try { const [rf, gas] = await Promise.all([api('/api/rf/history?limit=240'), api('/api/sensors/history?sensor=mq_raw&limit=300')]); S.rfHist = rf; S.gasHist = gas; renderRF(); renderEnv(); } catch (e) {}
+}
+async function refreshAll() { await Promise.all([refreshStatus(), refreshLists(), refreshSeries()]); }
+
+/* ---------- live feed ---------- */
+let ws, wsRetry = 0;
+function connect() {
+  S.ws = 'connecting'; renderTop();
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/live`);
+  ws.onopen = () => { wsRetry = 0; S.ws = 'open'; renderTop(); };
+  ws.onmessage = (m) => {
+    let d; try { d = JSON.parse(m.data); } catch (_) { return; }
+    if (d.type === 'jatayu') { S.status = Object.assign({}, S.status || {}, d); S.lastSnap = Date.now() / 1000; renderTop(); renderTiles(); renderRF(); renderEnv(); renderPhysical(); }
+    else if (d.type === 'event') { S.events.push(d.event); if (S.events.length > 400) S.events.shift(); renderEvents(); clearTimeout(connect.t); connect.t = setTimeout(refreshLists, 300); }
+    else if (d.type === 'key') { refreshStatus(); }
+  };
+  ws.onclose = () => { S.ws = 'lost'; renderTop(); setTimeout(connect, Math.min(10000, 1000 * ++wsRetry)); };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+refreshAll().then(connect);
+setInterval(refreshStatus, 5000);
+setInterval(renderTop, 2000);
+setInterval(refreshLists, 4000);
+setInterval(refreshSeries, 5000);
+new ResizeObserver(() => { clearTimeout(window.__rs); window.__rs = setTimeout(() => { renderRF(); renderEnv(); }, 150); }).observe(document.body);
+</script>
+</body>
+</html>

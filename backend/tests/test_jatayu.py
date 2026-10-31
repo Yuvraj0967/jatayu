@@ -344,3 +344,19 @@ def test_api_nodes_notes_and_manual_incident():
         assert client.put("/api/nodes/sim_rx_01", json={"x_m": "far"}).status_code == 400
         assert client.put("/api/nodes/bad id!", json={"x_m": 1}).status_code in (400, 404)
         assert client.put("/api/nodes/sim_rx_01", json={}).status_code == 400
+
+
+def test_console_and_csi_pages_are_served():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        home = client.get("/")
+        assert home.status_code == 200 and "JATAYU Console" in home.text
+        assert "Not a calibrated or certified" in home.text or "not a gas concentration" in home.text
+        for banned in ("survivor detected", "Breathing detected"):
+            assert banned.lower() not in home.text.lower()
+        csi = client.get("/csi")
+        assert csi.status_code == 200 and "RescueSense Console" not in csi.text

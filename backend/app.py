@@ -40,7 +40,8 @@ from jatayu.service import JatayuService
 from jatayu.store import Store
 
 BACKEND_DIR = Path(__file__).resolve().parent
-DASHBOARD = BACKEND_DIR.parent / "dashboard" / "index.html"
+DASHBOARD = BACKEND_DIR.parent / "dashboard" / "console.html"  # JATAYU operator console (served at /)
+CSI_PAGE = BACKEND_DIR.parent / "dashboard" / "index.html"  # CSI view and calibration (served at /csi)
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
     "empty": "No clear periodic pattern",
@@ -357,6 +358,11 @@ def create_app(options: RuntimeOptions) -> Starlette:
             return error(f"Dashboard not found at {DASHBOARD}", 404)
         return FileResponse(DASHBOARD, headers={"Cache-Control": "no-store"})
 
+    async def csi_page(_request: Request) -> Response:
+        if not CSI_PAGE.exists():
+            return error(f"CSI page not found at {CSI_PAGE}", 404)
+        return FileResponse(CSI_PAGE, headers={"Cache-Control": "no-store"})
+
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse(runtime.status())
 
@@ -412,6 +418,7 @@ def create_app(options: RuntimeOptions) -> Starlette:
 
     routes = [
         Route("/", dashboard),
+        Route("/csi", csi_page),
         Route("/health", health),
         Route("/telemetry", telemetry),
         Route("/ports", ports),
