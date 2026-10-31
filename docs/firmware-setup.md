@@ -33,8 +33,8 @@ notepad firmware\sdkconfig.wifi
 ```
 
 ```ini
-CONFIG_RESCUE_WIFI_SSID="YourHotspotName"
-CONFIG_RESCUE_WIFI_PASSWORD="your-wifi-password"
+CONFIG_JATAYU_WIFI_SSID="YourHotspotName"
+CONFIG_JATAYU_WIFI_PASSWORD="your-wifi-password"
 ```
 
 Use a **2.4 GHz** network — the ESP32-S3 is 2.4 GHz only, and a normal WPA2
@@ -47,7 +47,7 @@ Hotspot → **Maximize Compatibility**; on Android, choose the 2.4 GHz band.
 .\tools\build-flash.ps1
 ```
 
-This copies `firmware\` to `C:\esp\rescuesense-fw` (ESP-IDF refuses to build
+This copies `firmware\` to `C:\esp\jatayu-fw` (ESP-IDF refuses to build
 from a path with spaces, and this project lives under `HACK0WEEN 2.0`),
 configures the ESP32-S3 target with `sdkconfig.defaults` + your
 `sdkconfig.wifi`, builds, auto-detects the board's COM port (Bluetooth virtual
@@ -72,7 +72,7 @@ program can own the serial port.
 Status lines begin with `#`; data lines are the CSI rows:
 
 ```text
-#RESCUESENSE,fw=2.0,mode=router,ping_hz=100,gain=compensate,...
+#JATAYU,fw=3.0,mode=router,ping_hz=100,gain=compensate,...
 #WIFI,connected,channel=6,bssid=...
 #GAIN,mode=compensate,base_agc=...,base_fft=...
 CSI,123456789,-47,31.0,35.2,42.1,...

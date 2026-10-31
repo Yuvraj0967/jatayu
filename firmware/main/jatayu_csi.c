@@ -1,5 +1,8 @@
 /*
- * RescueSense CSI receiver (ESP32-S3)
+ * JATAYU CSI receiver (ESP32-S3)
+ *
+ * Role: Wi-Fi CSI acquisition only. The Raspberry Pi owns all signal
+ * processing, storage and decisions; this firmware never interprets CSI.
  *
  * Derived from Espressif's official esp-csi examples:
  *   examples/get-started/csi_recv_router/main/app_main.c
@@ -7,13 +10,14 @@
  * SPDX-License-Identifier: CC0-1.0
  *
  * Router mode (default) joins a 2.4 GHz AP and pings its gateway at
- * CONFIG_RESCUE_PING_HZ; CSI is taken from the AP's replies.  Direct mode is
+ * CONFIG_JATAYU_PING_HZ; CSI is taken from the AP's replies.  Direct mode is
  * for Espressif's stock csi_send running on a second ESP32.
  *
- * Wire protocol (one line per CSI packet, console port):
+ * Wire protocol (one line per CSI packet, console port, 921600 baud):
  *   CSI,<timestamp_us>,<rssi_dbm>,<amp_sc0>,<amp_sc1>,...
  * Amplitudes carry one decimal place.  Status lines start with '#'.
- * Host commands (one per line): ALERT,1  ALERT,0  STATUS  PING
+ * Host commands (one per line): STATUS  PING  RESET_GAIN
+ * Unknown lines (e.g. legacy ALERT,x heartbeats) are ignored.
  */
 
 #include <inttypes.h>
@@ -26,11 +30,11 @@
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "driver/gpio.h"
 #include "esp_csi_gain_ctrl.h"
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -46,15 +50,15 @@
 #include "driver/uart_vfs.h"
 #endif
 
-#if CONFIG_RESCUE_ROUTER_MODE
+#if CONFIG_JATAYU_ROUTER_MODE
 #include "lwip/ip4_addr.h"
 #include "ping/ping_sock.h"
 #else
 #include "esp_now.h"
 #endif
 
-#define TAG "rescuesense"
-#define FIRMWARE_VERSION "2.0"
+#define TAG "jatayu"
+#define FIRMWARE_VERSION "3.0"
 
 /* LLTF-only CSI is 64 subcarriers (128 bytes) on HT20 and 128 subcarriers
  * (256 bytes) when an HT40 packet slips through. */
@@ -71,14 +75,14 @@
 #define STATS_INTERVAL_US 2000000
 
 #if defined(WIFI_CSI_PHY_GAIN_ENABLE) && WIFI_CSI_PHY_GAIN_ENABLE
-#define RESCUE_HAS_GAIN_CTRL 1
+#define JATAYU_HAS_GAIN_CTRL 1
 #else
-#define RESCUE_HAS_GAIN_CTRL 0
+#define JATAYU_HAS_GAIN_CTRL 0
 #endif
 
-#if CONFIG_RESCUE_GAIN_FORCE
+#if CONFIG_JATAYU_GAIN_FORCE
 #define GAIN_MODE_NAME "force"
-#elif CONFIG_RESCUE_GAIN_OFF
+#elif CONFIG_JATAYU_GAIN_OFF
 #define GAIN_MODE_NAME "off"
 #else
 #define GAIN_MODE_NAME "compensate"
@@ -86,7 +90,7 @@
 
 /* Only the optional two-board ESP-NOW mode uses these addresses. Keeping
  * them out of the router build avoids unused-constant errors under -Werror. */
-#if !CONFIG_RESCUE_ROUTER_MODE
+#if !CONFIG_JATAYU_ROUTER_MODE
 static const uint8_t DIRECT_TX_MAC[6] = {0x1a, 0x00, 0x00, 0x00, 0x00, 0x00};
 static const uint8_t DIRECT_RX_MAC[6] = {0x1a, 0x00, 0x00, 0x00, 0x00, 0x01};
 #endif
@@ -102,8 +106,6 @@ typedef struct {
 
 static QueueHandle_t s_csi_queue;
 static uint8_t s_expected_sender[6];
-static volatile bool s_alert_active;
-static volatile int64_t s_last_command_us;
 static volatile uint32_t s_dropped_frames;
 static volatile uint32_t s_received_frames;
 
@@ -131,7 +133,7 @@ static void init_nvs(void)
 /*
  * Without a driver, ESP-IDF's console stdin is non-blocking: fgets() returns
  * NULL whenever the FIFO is empty and the stream's error flag sticks, so
- * ALERT commands were silently lost.  Installing the driver makes stdin a
+ * host commands were silently lost.  Installing the driver makes stdin a
  * normal blocking stream on whichever console the sdkconfig selected.
  */
 static void init_console_io(void)
@@ -148,53 +150,17 @@ static void init_console_io(void)
 #endif
 }
 
-static void alert_task(void *arg)
-{
-    bool on = false;
-    while (true) {
-        if (s_alert_active && CONFIG_RESCUE_ALERT_TIMEOUT_S > 0
-                && esp_timer_get_time() - s_last_command_us > (int64_t)CONFIG_RESCUE_ALERT_TIMEOUT_S * 1000000) {
-            /* The laptop refreshes the alert state every few seconds.  If it
-             * crashes or the cable is pulled, do not leave the buzzer on. */
-            s_alert_active = false;
-            printf("#ALERT,0,timeout\n");
-            fflush(stdout);
-        }
-        if (s_alert_active) {
-            on = !on;
-            gpio_set_level(CONFIG_RESCUE_BUZZER_GPIO, on ? 1 : 0);
-            vTaskDelay(pdMS_TO_TICKS(125));
-        } else {
-            on = false;
-            gpio_set_level(CONFIG_RESCUE_BUZZER_GPIO, 0);
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
-}
-
-static void init_alert_gpio(void)
-{
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << CONFIG_RESCUE_BUZZER_GPIO),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-    gpio_set_level(CONFIG_RESCUE_BUZZER_GPIO, 0);
-}
-
 static void print_status(void)
 {
-    printf("#STATUS,fw=" FIRMWARE_VERSION ",alert=%d,received=%" PRIu32 ",dropped=%" PRIu32
-           ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d\n",
-           s_alert_active ? 1 : 0, s_received_frames, s_dropped_frames,
+    printf("#STATUS,fw=" FIRMWARE_VERSION ",uptime_s=%" PRIu32 ",heap=%" PRIu32 ",received=%" PRIu32
+           ",dropped=%" PRIu32 ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d\n",
+           (uint32_t)(esp_timer_get_time() / 1000000), (uint32_t)esp_get_free_heap_size(),
+           s_received_frames, s_dropped_frames,
            s_gain_ready ? 1 : 0, (unsigned)s_last_agc, (int)s_last_fft);
     fflush(stdout);
 }
 
-/* The backend writes ALERT,1 / ALERT,0 (and a periodic heartbeat) here. */
+/* Host commands. Anything unrecognised is ignored, never an error. */
 static void serial_command_task(void *arg)
 {
     char line[48];
@@ -204,24 +170,14 @@ static void serial_command_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
-        s_last_command_us = esp_timer_get_time();
-
-        if (strncmp(line, "ALERT,1", 7) == 0) {
-            if (!s_alert_active) {
-                printf("#ALERT,1\n");
-                fflush(stdout);
-            }
-            s_alert_active = true;
-        } else if (strncmp(line, "ALERT,0", 7) == 0) {
-            if (s_alert_active) {
-                printf("#ALERT,0\n");
-                fflush(stdout);
-            }
-            s_alert_active = false;
-        } else if (strncmp(line, "STATUS", 6) == 0) {
+        if (strncmp(line, "STATUS", 6) == 0) {
             print_status();
         } else if (strncmp(line, "PING", 4) == 0) {
             printf("#PONG\n");
+            fflush(stdout);
+        } else if (strncmp(line, "RESET_GAIN", 10) == 0) {
+            s_gain_reset_requested = true;
+            printf("#GAIN,reset_requested\n");
             fflush(stdout);
         }
     }
@@ -241,13 +197,13 @@ static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
     }
 
     float gain = 1.0f;
-#if RESCUE_HAS_GAIN_CTRL
+#if JATAYU_HAS_GAIN_CTRL
     if (s_gain_reset_requested) {
         /* A new association (possibly a different AP) needs a new reference. */
         s_gain_reset_requested = false;
         s_gain_ready = false;
         s_gain_samples = 0;
-#if CONFIG_RESCUE_GAIN_FORCE
+#if CONFIG_JATAYU_GAIN_FORCE
         esp_csi_gain_ctrl_set_rx_force_gain(0, 0);
 #endif
         esp_csi_gain_ctrl_reset_rx_gain_baseline();
@@ -267,7 +223,7 @@ static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
             uint8_t base_agc = 0;
             int8_t base_fft = 0;
             if (esp_csi_gain_ctrl_get_rx_gain_baseline(&base_agc, &base_fft) == ESP_OK) {
-#if CONFIG_RESCUE_GAIN_FORCE
+#if CONFIG_JATAYU_GAIN_FORCE
                 esp_csi_gain_ctrl_set_rx_force_gain(base_agc, base_fft);
 #endif
                 s_base_agc = base_agc;
@@ -283,13 +239,13 @@ static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
         return;
     }
 
-#if CONFIG_RESCUE_GAIN_COMPENSATE
+#if CONFIG_JATAYU_GAIN_COMPENSATE
     if (esp_csi_gain_ctrl_get_gain_compensation(&gain, agc_gain, fft_gain) != ESP_OK
             || !isfinite(gain) || gain <= 0.0f || gain > 16.0f) {
         gain = 1.0f;
     }
 #endif
-#endif /* RESCUE_HAS_GAIN_CTRL */
+#endif /* JATAYU_HAS_GAIN_CTRL */
     s_last_gain = gain;
 
     csi_frame_t frame = {
@@ -381,9 +337,10 @@ static void csi_print_task(void *arg)
         if (now - window_start_us >= STATS_INTERVAL_US) {
             float rate = (float)printed_in_window * 1.0e6f / (float)(now - window_start_us);
             printf("#STAT,pps=%.1f,dropped=%" PRIu32 ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d,"
-                   "comp=%.3f,alert=%d\n",
+                   "comp=%.3f,uptime_s=%" PRIu32 ",heap=%" PRIu32 "\n",
                    (double)rate, s_dropped_frames, s_gain_ready ? 1 : 0,
-                   (unsigned)s_last_agc, (int)s_last_fft, (double)s_last_gain, s_alert_active ? 1 : 0);
+                   (unsigned)s_last_agc, (int)s_last_fft, (double)s_last_gain,
+                   (uint32_t)(now / 1000000), (uint32_t)esp_get_free_heap_size());
             fflush(stdout);
             window_start_us = now;
             printed_in_window = 0;
@@ -396,7 +353,7 @@ static void wifi_csi_init(void)
     /* Router mode already receives AP replies as an associated STA. Keeping
      * promiscuous mode off prevents unrelated AP traffic from entering the
      * BSSID-filtered CSI stream; direct ESP-NOW mode needs it. */
-#if !CONFIG_RESCUE_ROUTER_MODE
+#if !CONFIG_JATAYU_ROUTER_MODE
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
 #endif
 
@@ -417,7 +374,7 @@ static void wifi_csi_init(void)
     ESP_ERROR_CHECK(esp_wifi_set_csi(true));
 }
 
-#if CONFIG_RESCUE_ROUTER_MODE
+#if CONFIG_JATAYU_ROUTER_MODE
 
 #define WIFI_GOT_IP_BIT BIT0
 
@@ -427,7 +384,7 @@ static volatile uint32_t s_gateway_ip;
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        printf("#WIFI,connecting,ssid=%s\n", CONFIG_RESCUE_WIFI_SSID);
+        printf("#WIFI,connecting,ssid=%s\n", CONFIG_JATAYU_WIFI_SSID);
         fflush(stdout);
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
@@ -474,7 +431,7 @@ static void router_link_task(void *arg)
 
         esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
         config.count = 0; /* run until reset */
-        config.interval_ms = 1000 / CONFIG_RESCUE_PING_HZ;
+        config.interval_ms = 1000 / CONFIG_JATAYU_PING_HZ;
         config.task_stack_size = 3072;
         config.data_size = 1;
         config.target_addr.type = ESP_IPADDR_TYPE_V4;
@@ -484,7 +441,7 @@ static void router_link_task(void *arg)
         esp_ip4_addr_t shown = {.addr = gateway};
         if (esp_ping_new_session(&config, &callbacks, &ping) == ESP_OK && esp_ping_start(ping) == ESP_OK) {
             ping_target = gateway;
-            printf("#PING,gateway=" IPSTR ",hz=%d\n", IP2STR(&shown), CONFIG_RESCUE_PING_HZ);
+            printf("#PING,gateway=" IPSTR ",hz=%d\n", IP2STR(&shown), CONFIG_JATAYU_PING_HZ);
         } else {
             ping = NULL;
             printf("#PING,error,gateway=" IPSTR "\n", IP2STR(&shown));
@@ -509,8 +466,8 @@ static void init_router_mode(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = CONFIG_RESCUE_WIFI_SSID,
-            .password = CONFIG_RESCUE_WIFI_PASSWORD,
+            .ssid = CONFIG_JATAYU_WIFI_SSID,
+            .password = CONFIG_JATAYU_WIFI_PASSWORD,
             .scan_method = WIFI_ALL_CHANNEL_SCAN,
             .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
             /* Accept open, WPA2 and WPA3 hotspots alike. */
@@ -520,7 +477,7 @@ static void init_router_mode(void)
     };
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-#if CONFIG_RESCUE_FORCE_HT20
+#if CONFIG_JATAYU_FORCE_HT20
     /* Advertise 20 MHz only, so the AP never mixes 64- and 128-subcarrier
      * packets into one capture (the old backend reset its 30 s window on
      * every width change). */
@@ -544,7 +501,7 @@ static void init_direct_espnow(void)
     ESP_ERROR_CHECK(esp_now_set_pmk((uint8_t *)"pmk1234567890123"));
 
     esp_now_peer_info_t peer = {
-        .channel = CONFIG_RESCUE_DIRECT_CHANNEL,
+        .channel = CONFIG_JATAYU_DIRECT_CHANNEL,
         .ifidx = WIFI_IF_STA,
         .encrypt = false,
         .peer_addr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
@@ -574,13 +531,13 @@ static void init_direct_mode(void)
     ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT40));
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-    ESP_ERROR_CHECK(esp_wifi_set_channel(CONFIG_RESCUE_DIRECT_CHANNEL, WIFI_SECOND_CHAN_BELOW));
+    ESP_ERROR_CHECK(esp_wifi_set_channel(CONFIG_JATAYU_DIRECT_CHANNEL, WIFI_SECOND_CHAN_BELOW));
 
     memcpy(s_expected_sender, DIRECT_TX_MAC, sizeof(s_expected_sender));
     s_gain_reset_requested = true;
     init_direct_espnow();
     wifi_csi_init();
-    printf("#DIRECT,channel=%d,sender=" MACSTR "\n", CONFIG_RESCUE_DIRECT_CHANNEL, MAC2STR(DIRECT_TX_MAC));
+    printf("#DIRECT,channel=%d,sender=" MACSTR "\n", CONFIG_JATAYU_DIRECT_CHANNEL, MAC2STR(DIRECT_TX_MAC));
     fflush(stdout);
 }
 #endif
@@ -589,29 +546,26 @@ void app_main(void)
 {
     init_console_io();
     init_nvs();
-    init_alert_gpio();
-    s_last_command_us = esp_timer_get_time();
 
     s_csi_queue = xQueueCreate(CSI_QUEUE_DEPTH, sizeof(csi_frame_t));
     configASSERT(s_csi_queue != NULL);
 
-#if CONFIG_RESCUE_ROUTER_MODE
-    printf("#RESCUESENSE,fw=" FIRMWARE_VERSION ",mode=router,ping_hz=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
-           CONFIG_RESCUE_PING_HZ);
+#if CONFIG_JATAYU_ROUTER_MODE
+    printf("#JATAYU,role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",mode=router,ping_hz=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
+           CONFIG_JATAYU_PING_HZ);
 #else
-    printf("#RESCUESENSE,fw=" FIRMWARE_VERSION ",mode=direct,channel=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
-           CONFIG_RESCUE_DIRECT_CHANNEL);
+    printf("#JATAYU,role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",mode=direct,channel=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
+           CONFIG_JATAYU_DIRECT_CHANNEL);
 #endif
     fflush(stdout);
 
     xTaskCreate(csi_print_task, "csi_uart", 6144, NULL, 5, NULL);
-    xTaskCreate(alert_task, "alert", 2560, NULL, 4, NULL);
     xTaskCreate(serial_command_task, "serial_cmd", 3072, NULL, 3, NULL);
 
-#if CONFIG_RESCUE_ROUTER_MODE
+#if CONFIG_JATAYU_ROUTER_MODE
     init_router_mode();
 #else
     init_direct_mode();
 #endif
-    ESP_LOGI(TAG, "RescueSense receiver running");
+    ESP_LOGI(TAG, "JATAYU CSI receiver running");
 }

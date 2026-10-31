@@ -29,7 +29,7 @@ rescue-sense/
 │   ├── CMakeLists.txt
 │   ├── sdkconfig.defaults
 │   └── main/
-│       ├── rescue_sense_csi.c
+│       ├── jatayu_csi.c
 │       ├── Kconfig.projbuild
 │       └── idf_component.yml
 ├── backend/

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Build the RescueSense ESP32-S3 firmware and flash it.
+  Build the JATAYU ESP32-S3 firmware and flash it.
 
 .DESCRIPTION
   - Loads ESP-IDF (export.ps1) if idf.py is not already available.
@@ -20,7 +20,7 @@ param(
     [string]$Port = 'auto',
     [ValidateSet('uart', 'usb')][string]$Console = 'uart',
     [string]$IdfPath = $(if ($env:IDF_PATH) { $env:IDF_PATH } else { 'C:\esp\esp-idf-v5.5.6' }),
-    [string]$WorkDir = 'C:\esp\rescuesense-fw',
+    [string]$WorkDir = 'C:\esp\jatayu-fw',
     [switch]$BuildOnly,
     [switch]$Monitor
 )
@@ -94,7 +94,7 @@ try {
     idf.py build
     if ($LASTEXITCODE -ne 0) { throw 'Build failed. Scroll up for the first error.' }
     if ($BuildOnly) {
-        Write-Host "Build OK: $WorkDir\build\rescue_sense_csi.bin" -ForegroundColor Green
+        Write-Host "Build OK: $WorkDir\build\jatayu_csi.bin" -ForegroundColor Green
         return
     }
 

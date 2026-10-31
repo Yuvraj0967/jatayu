@@ -225,7 +225,7 @@ class CSIStreamParser:
         if kind == "STAT":
             self.device["stats"] = values
             self.device["stats_at"] = time.monotonic()
-        elif kind == "RESCUESENSE":
+        elif kind in {"JATAYU", "RESCUESENSE"}:
             self.device["firmware"] = values
         elif kind == "WIFI":
             state = flags[0] if flags else "unknown"
