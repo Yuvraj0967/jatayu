@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 
 from starlette.requests import Request
@@ -78,6 +79,48 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
     async def incident_detail(r: Request) -> JSONResponse:
         detail = service.store.incident_detail(int(r.path_params["id"]))
         return JSONResponse(detail) if detail else err("incident not found", 404)
+
+    async def create_incident(r: Request) -> JSONResponse:
+        summary = (await body(r)).get("summary")
+        if not isinstance(summary, str) or not 3 <= len(summary.strip()) <= 200:
+            return err("summary must be a string of 3 to 200 characters")
+        return JSONResponse(service.create_incident(summary), status_code=201)
+
+    async def add_note(r: Request) -> JSONResponse:
+        text = (await body(r)).get("text")
+        if not isinstance(text, str) or not 1 <= len(text.strip()) <= 500:
+            return err("text must be a string of 1 to 500 characters")
+        result = service.add_note(int(r.path_params["id"]), text.strip())
+        return JSONResponse(result, status_code=201) if result else err("incident not found or already closed", 404)
+
+    async def nodes(_r: Request) -> JSONResponse:
+        return JSONResponse(service.store.nodes())
+
+    async def update_node(r: Request) -> JSONResponse:
+        node_id = r.path_params["node_id"]
+        if not re.fullmatch(r"[A-Za-z0-9_\-]{1,40}", node_id):
+            return err("node_id may contain letters, digits, _ and - (max 40)")
+        data = await body(r)
+        fields: dict[str, Any] = {}
+        for key in ("x_m", "y_m", "z_m"):
+            if key in data:
+                v = data[key]
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or not -1000 <= v <= 1000:
+                    return err(f"{key} must be a number of metres between -1000 and 1000")
+                fields[key] = float(v)
+        if "orientation_deg" in data:
+            v = data["orientation_deg"]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v < 360:
+                return err("orientation_deg must be a number from 0 to under 360")
+            fields["orientation_deg"] = float(v)
+        for key, limit in (("antenna", 64), ("notes", 500), ("role", 40)):
+            if key in data:
+                if not isinstance(data[key], str) or len(data[key]) > limit:
+                    return err(f"{key} must be a string up to {limit} characters")
+                fields[key] = data[key]
+        if not fields:
+            return err("no valid node fields supplied")
+        return JSONResponse(service.update_node(node_id, fields))
 
     async def events(r: Request) -> JSONResponse:
         return JSONResponse(service.store.events(limit=int_param(r, "limit", 100, 1, 1000)))
@@ -164,6 +207,10 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
         Route("/api/rf/status", rf_status),
         Route("/api/rf/history", rf_history),
         Route("/api/incidents", incidents),
+        Route("/api/incidents", create_incident, methods=["POST"]),
+        Route("/api/incidents/{id:int}/notes", add_note, methods=["POST"]),
+        Route("/api/nodes", nodes),
+        Route("/api/nodes/{node_id}", update_node, methods=["PUT"]),
         Route("/api/incidents/{id:int}", incident_detail),
         Route("/api/incidents/{id:int}/acknowledge", acknowledge, methods=["POST"]),
         Route("/api/incidents/{id:int}/close", close, methods=["POST"]),

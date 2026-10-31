@@ -1,12 +1,11 @@
 <#
 .SYNOPSIS
-  Start the RescueSense backend and open the dashboard.
+  Start the JATAYU backend and open the dashboard.
 
 .EXAMPLE
   .\tools\start-demo.ps1                     # live ESP32, serial port auto-detected
   .\tools\start-demo.ps1 -SerialPort COM9    # explicit port
   .\tools\start-demo.ps1 -Simulate           # no hardware
-  .\tools\start-demo.ps1 -AutoAlert          # buzzer follows detections
 
 .NOTES
   The old script declared a parameter named $Host, which is a read-only
@@ -15,7 +14,6 @@
 param(
     [string]$SerialPort = "auto",
     [switch]$Simulate,
-    [switch]$AutoAlert,
     [string]$BindHost = "127.0.0.1",
     [int]$Port = 8000,
     [switch]$NoBrowser
@@ -35,7 +33,6 @@ $prefix = @($python | Select-Object -Skip 1)
 
 $arguments = @('app.py', '--host', $BindHost, '--port', "$Port")
 if ($Simulate) { $arguments += '--simulate' } else { $arguments += @('--serial-port', $SerialPort) }
-if ($AutoAlert) { $arguments += '--auto-alert' }
 if (-not $NoBrowser) { $arguments += '--open' }
 
 Push-Location $backend

@@ -53,6 +53,11 @@ class CSIFrame:
     timestamp_s: float
     rssi: float
     amplitudes: np.ndarray
+    # Present on protocol-v1 (CSI1) lines only; None for legacy/stock rows.
+    seq: int | None = None
+    channel: int | None = None
+    noise_floor: float | None = None
+    first_word_invalid: bool = False
 
 
 @dataclass

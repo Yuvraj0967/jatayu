@@ -13,11 +13,17 @@
  * CONFIG_JATAYU_PING_HZ; CSI is taken from the AP's replies.  Direct mode is
  * for Espressif's stock csi_send running on a second ESP32.
  *
- * Wire protocol (one line per CSI packet, console port, 921600 baud):
- *   CSI,<timestamp_us>,<rssi_dbm>,<amp_sc0>,<amp_sc1>,...
- * Amplitudes carry one decimal place.  Status lines start with '#'.
- * Host commands (one per line): STATUS  PING  RESET_GAIN
+ * Wire protocol v1 (one line per CSI packet, console port, 921600 baud):
+ *   CSI1,<seq>,<timestamp_us>,<rssi_dbm>,<noise_floor_dbm>,<channel>,<flags>,<amp_sc0>,<amp_sc1>,...
+ *     seq    increments for every CSI callback accepted BEFORE queueing, so a
+ *            queue overflow shows up on the Pi as a sequence gap, not silence
+ *     flags  bit0 = first_word_invalid (ESP32-S3 hardware limitation)
+ *     amps   gain-compensated magnitudes with one decimal place
+ * Status lines start with '#' and never contain CSI data.
+ * Host commands (one per line): STATUS  PING  RESET_GAIN  STREAM,0|1  MODE,RAW
  * Unknown lines (e.g. legacy ALERT,x heartbeats) are ignored.
+ * Only RAW mode exists: feature mode is added after the Pi reference
+ * pipeline has been validated against raw captures.
  */
 
 #include <inttypes.h>
@@ -58,7 +64,8 @@
 #endif
 
 #define TAG "jatayu"
-#define FIRMWARE_VERSION "3.0"
+#define FIRMWARE_VERSION "3.1"
+#define PROTOCOL_VERSION 1
 
 /* LLTF-only CSI is 64 subcarriers (128 bytes) on HT20 and 128 subcarriers
  * (256 bytes) when an HT40 packet slips through. */
@@ -96,6 +103,9 @@ static const uint8_t DIRECT_RX_MAC[6] = {0x1a, 0x00, 0x00, 0x00, 0x00, 0x01};
 #endif
 
 typedef struct {
+    uint32_t seq;
+    int8_t noise_floor;
+    uint8_t channel;
     uint64_t timestamp_us;
     uint16_t len;
     int8_t rssi;
@@ -108,6 +118,10 @@ static QueueHandle_t s_csi_queue;
 static uint8_t s_expected_sender[6];
 static volatile uint32_t s_dropped_frames;
 static volatile uint32_t s_received_frames;
+static volatile uint32_t s_tx_frames;
+static volatile uint32_t s_seq;
+static volatile uint32_t s_queue_high_water;
+static volatile bool s_stream_enabled = true;
 
 static volatile bool s_gain_reset_requested;
 static volatile bool s_gain_ready;
@@ -150,13 +164,29 @@ static void init_console_io(void)
 #endif
 }
 
+static const char *reset_reason_name(void)
+{
+    switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "poweron";
+    case ESP_RST_SW: return "software";
+    case ESP_RST_PANIC: return "panic";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT: return "watchdog";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    default: return "other";
+    }
+}
+
 static void print_status(void)
 {
-    printf("#STATUS,fw=" FIRMWARE_VERSION ",uptime_s=%" PRIu32 ",heap=%" PRIu32 ",received=%" PRIu32
-           ",dropped=%" PRIu32 ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d\n",
+    printf("#STATUS,fw=" FIRMWARE_VERSION ",node=" CONFIG_JATAYU_NODE_ID ",uptime_s=%" PRIu32 ",heap=%" PRIu32
+           ",min_heap=%" PRIu32 ",received=%" PRIu32 ",tx=%" PRIu32 ",dropped=%" PRIu32 ",stream=%d"
+           ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d\n",
            (uint32_t)(esp_timer_get_time() / 1000000), (uint32_t)esp_get_free_heap_size(),
-           s_received_frames, s_dropped_frames,
-           s_gain_ready ? 1 : 0, (unsigned)s_last_agc, (int)s_last_fft);
+           (uint32_t)esp_get_minimum_free_heap_size(), s_received_frames, s_tx_frames, s_dropped_frames,
+           s_stream_enabled ? 1 : 0, s_gain_ready ? 1 : 0, (unsigned)s_last_agc, (int)s_last_fft);
     fflush(stdout);
 }
 
@@ -175,6 +205,17 @@ static void serial_command_task(void *arg)
         } else if (strncmp(line, "PING", 4) == 0) {
             printf("#PONG\n");
             fflush(stdout);
+        } else if (strncmp(line, "STREAM,", 7) == 0) {
+            s_stream_enabled = line[7] != '0';
+            printf("#STREAM,%d\n", s_stream_enabled ? 1 : 0);
+            fflush(stdout);
+        } else if (strncmp(line, "MODE,", 5) == 0) {
+            if (strncmp(line + 5, "RAW", 3) == 0) {
+                printf("#MODE,RAW\n");
+            } else {
+                printf("#ERR,mode_not_supported,only=RAW\n");
+            }
+            fflush(stdout);
         } else if (strncmp(line, "RESET_GAIN", 10) == 0) {
             s_gain_reset_requested = true;
             printf("#GAIN,reset_requested\n");
@@ -190,6 +231,9 @@ static void serial_command_task(void *arg)
 static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
 {
     if (info == NULL || info->buf == NULL || info->len == 0) {
+        return;
+    }
+    if (!s_stream_enabled) {
         return;
     }
     if (memcmp(info->mac, s_expected_sender, sizeof(s_expected_sender)) != 0) {
@@ -249,6 +293,9 @@ static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
     s_last_gain = gain;
 
     csi_frame_t frame = {
+        .seq = ++s_seq,
+        .noise_floor = (int8_t)info->rx_ctrl.noise_floor,
+        .channel = (uint8_t)info->rx_ctrl.channel,
         .timestamp_us = (uint64_t)esp_timer_get_time(),
         .len = info->len > CSI_BYTES_MAX ? CSI_BYTES_MAX : info->len,
         .rssi = info->rx_ctrl.rssi,
@@ -283,7 +330,9 @@ static size_t append_u32(char *dst, uint32_t value)
  */
 static size_t format_frame(const csi_frame_t *frame, char *out, size_t capacity)
 {
-    int written = snprintf(out, capacity, "CSI,%" PRIu64 ",%d", frame->timestamp_us, (int)frame->rssi);
+    int written = snprintf(out, capacity, "CSI1,%" PRIu32 ",%" PRIu64 ",%d,%d,%u,%u", frame->seq,
+                           frame->timestamp_us, (int)frame->rssi, (int)frame->noise_floor,
+                           (unsigned)frame->channel, frame->first_word_invalid ? 1u : 0u);
     size_t pos = written > 0 ? (size_t)written : 0;
 
     uint16_t count = frame->len / 2;
@@ -322,6 +371,11 @@ static void csi_print_task(void *arg)
             fwrite(s_line, 1, length, stdout);
             fflush(stdout);
             ++printed_in_window;
+            ++s_tx_frames;
+            UBaseType_t waiting = uxQueueMessagesWaiting(s_csi_queue);
+            if (waiting > s_queue_high_water) {
+                s_queue_high_water = waiting;
+            }
         }
 
         if (s_gain_ready && !announced_gain) {
@@ -337,10 +391,13 @@ static void csi_print_task(void *arg)
         if (now - window_start_us >= STATS_INTERVAL_US) {
             float rate = (float)printed_in_window * 1.0e6f / (float)(now - window_start_us);
             printf("#STAT,pps=%.1f,dropped=%" PRIu32 ",gain=" GAIN_MODE_NAME ",gain_ready=%d,agc=%u,fft=%d,"
-                   "comp=%.3f,uptime_s=%" PRIu32 ",heap=%" PRIu32 "\n",
+                   "comp=%.3f,uptime_s=%" PRIu32 ",heap=%" PRIu32 ",min_heap=%" PRIu32 ",rx=%" PRIu32
+                   ",tx=%" PRIu32 ",qhw=%" PRIu32 ",seq=%" PRIu32 ",stream=%d,node=" CONFIG_JATAYU_NODE_ID "\n",
                    (double)rate, s_dropped_frames, s_gain_ready ? 1 : 0,
                    (unsigned)s_last_agc, (int)s_last_fft, (double)s_last_gain,
-                   (uint32_t)(now / 1000000), (uint32_t)esp_get_free_heap_size());
+                   (uint32_t)(now / 1000000), (uint32_t)esp_get_free_heap_size(),
+                   (uint32_t)esp_get_minimum_free_heap_size(), s_received_frames, s_tx_frames,
+                   (uint32_t)s_queue_high_water, s_seq, s_stream_enabled ? 1 : 0);
             fflush(stdout);
             window_start_us = now;
             printed_in_window = 0;
@@ -551,11 +608,11 @@ void app_main(void)
     configASSERT(s_csi_queue != NULL);
 
 #if CONFIG_JATAYU_ROUTER_MODE
-    printf("#JATAYU,role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",mode=router,ping_hz=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
-           CONFIG_JATAYU_PING_HZ);
+    printf("#JATAYU,proto=%d,node=" CONFIG_JATAYU_NODE_ID ",role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",idf=%s,reset=%s,mode=router,ping_hz=%d,gain=" GAIN_MODE_NAME ",output=RAW,format=CSI1\n",
+           PROTOCOL_VERSION, esp_get_idf_version(), reset_reason_name(), CONFIG_JATAYU_PING_HZ);
 #else
-    printf("#JATAYU,role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",mode=direct,channel=%d,gain=" GAIN_MODE_NAME ",format=CSI,timestamp_us,rssi,amplitudes\n",
-           CONFIG_JATAYU_DIRECT_CHANNEL);
+    printf("#JATAYU,proto=%d,node=" CONFIG_JATAYU_NODE_ID ",role=csi_receiver,chip=esp32s3,fw=" FIRMWARE_VERSION ",idf=%s,reset=%s,mode=direct,channel=%d,gain=" GAIN_MODE_NAME ",output=RAW,format=CSI1\n",
+           PROTOCOL_VERSION, esp_get_idf_version(), reset_reason_name(), CONFIG_JATAYU_DIRECT_CHANNEL);
 #endif
     fflush(stdout);
 

@@ -1,4 +1,4 @@
-"""Starlette/WebSocket entry point for the RescueSense laptop backend.
+"""Starlette/WebSocket entry point for the JATAYU backend (laptop or Raspberry Pi).
 
 Examples:
     python app.py                     # auto-detect the ESP32 port
@@ -42,8 +42,8 @@ from jatayu.store import Store
 BACKEND_DIR = Path(__file__).resolve().parent
 DASHBOARD = BACKEND_DIR.parent / "dashboard" / "index.html"
 STATE_TEXT = {
-    "breathing": "Breathing detected",
-    "empty": "No breathing detected",
+    "breathing": "Periodic RF pattern observed",
+    "empty": "No clear periodic pattern",
     "motion": "Movement detected",
     "warming_up": "Collecting signal",
     "no_signal": "No CSI signal",
@@ -237,7 +237,7 @@ class RescueRuntime:
         delivered = self.reader.send_alert(self.alert_active) if self.reader else None
         self.alert_delivered = delivered
         if changed:
-            where = "ESP32 buzzer" if delivered else ("simulation only" if self.simulator else "not delivered: no serial link")
+            where = "software alert only; this build has no buzzer"
             self.log("alert", f"Alert {'ON' if active else 'OFF'} ({origin}; {where}).")
         acknowledgement = {
             "type": "alert_ack",
@@ -469,7 +469,7 @@ def _extract_alert_state(payload: dict[str, Any]) -> bool | None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="RescueSense Wi-Fi CSI backend")
+    parser = argparse.ArgumentParser(description="JATAYU backend (Wi-Fi CSI + environmental monitoring)")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--simulate", action="store_true", help="run a hardware-free CSI simulation")
     source.add_argument("--serial-port", default="auto", help="ESP32 serial port (default: auto-detect, e.g. COM9)")
@@ -483,7 +483,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--simulate-distance", type=float, default=2.5, help="synthetic proximity in metres")
     parser.add_argument("--simulate-absent", action="store_true", help="start the simulation with nobody present")
     parser.add_argument("--simulate-motion", action="store_true", help="add occasional random movement to the simulation")
-    parser.add_argument("--auto-alert", action="store_true", help="drive the buzzer automatically from detections")
+    parser.add_argument("--auto-alert", action="store_true", help="DEPRECATED: raises the software alert automatically (no buzzer exists in this build)")
     parser.add_argument("--arduino-port", default="auto", help="Arduino Mega port, 'auto', or 'none' (default: auto)")
     parser.add_argument("--arduino-baud", type=int, default=115200, help="Arduino baud rate (default: 115200)")
     parser.add_argument("--db", default=str(BACKEND_DIR / "jatayu.db"), help="SQLite database path")
@@ -526,7 +526,7 @@ def main() -> None:
     )
     url = f"http://{'127.0.0.1' if args.host in {'0.0.0.0', '::'} else args.host}:{args.port}"
     mode = "SIMULATION" if args.simulate else f"ESP32 serial ({args.serial_port})"
-    print(f"\n  RescueSense backend  |  source: {mode}\n  Dashboard: {url}\n  Stop with Ctrl+C\n")
+    print(f"\n  JATAYU backend  |  source: {mode}\n  Dashboard: {url}\n  Stop with Ctrl+C\n")
     if args.open:
         webbrowser.open(url)
     uvicorn.run(create_app(options), host=args.host, port=args.port, log_level="warning", access_log=False)

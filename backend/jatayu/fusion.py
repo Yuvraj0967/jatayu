@@ -15,14 +15,14 @@ from typing import Any
 # --- RF ----------------------------------------------------------------------
 
 RF_STATES = (
-    "DISCONNECTED", "COLLECTING", "INSUFFICIENT_DATA", "LOW_SIGNAL_QUALITY",
+    "NO_DATA", "COLLECTING", "INSUFFICIENT_DATA", "LOW_QUALITY",
     "NO_CLEAR_PERIODIC_PATTERN", "PERIODIC_PATTERN_OBSERVED", "REVIEW_RECOMMENDED",
 )
 RF_TEXT = {
-    "DISCONNECTED": "No CSI stream",
+    "NO_DATA": "No CSI stream",
     "COLLECTING": "Collecting signal",
     "INSUFFICIENT_DATA": "Insufficient data",
-    "LOW_SIGNAL_QUALITY": "Signal quality too low to assess",
+    "LOW_QUALITY": "Signal quality too low to assess",
     "NO_CLEAR_PERIODIC_PATTERN": "No clear periodic pattern",
     "PERIODIC_PATTERN_OBSERVED": "Periodic RF pattern observed",
     "REVIEW_RECOMMENDED": "Periodic RF pattern sustained; further investigation recommended",
@@ -34,6 +34,8 @@ class RfConfig:
     min_packet_rate_hz: float = 20.0
     good_packet_rate_hz: float = 50.0
     stale_after_s: float = 3.0
+    max_loss_ratio: float = 0.30   # above this, packet loss makes the window unusable
+    fair_loss_ratio: float = 0.10
     sustain_s: float = 20.0  # pattern must persist this long to recommend review
     moderate_conf: float = 0.45
     high_conf: float = 0.70
@@ -56,24 +58,32 @@ class RfAssessor:
         self.cfg = cfg or RfConfig()
         self._pattern_since: float | None = None
 
+    @staticmethod
+    def loss_ratio(telemetry: dict[str, Any]) -> float | None:
+        seq = (telemetry.get("serial") or {}).get("sequence") or {}
+        return seq.get("loss_ratio") if seq.get("received") else None
+
     def quality(self, telemetry: dict[str, Any]) -> str:
         link = telemetry.get("link") or {}
         rate = float(link.get("packet_rate_hz") or 0.0)
         age = link.get("last_frame_age_s")
         if not link.get("total_frames") or age is None or age > self.cfg.stale_after_s:
             return "none"
-        if rate < self.cfg.min_packet_rate_hz:
+        loss = self.loss_ratio(telemetry)
+        if rate < self.cfg.min_packet_rate_hz or (loss is not None and loss > self.cfg.max_loss_ratio):
             return "low"
-        return "good" if rate >= self.cfg.good_packet_rate_hz else "fair"
+        if rate < self.cfg.good_packet_rate_hz or (loss is not None and loss > self.cfg.fair_loss_ratio):
+            return "fair"
+        return "good"
 
     def assess(self, telemetry: dict[str, Any], now: float) -> dict[str, Any]:
         quality = self.quality(telemetry)
         raw_state = telemetry.get("state")
         conf = float(telemetry.get("confidence") or 0.0)
         if quality == "none":
-            state = "DISCONNECTED"
+            state = "NO_DATA"
         elif quality == "low":
-            state = "LOW_SIGNAL_QUALITY"
+            state = "LOW_QUALITY"
         elif raw_state == "warming_up":
             state = "COLLECTING"
         elif not telemetry.get("valid"):
@@ -95,12 +105,13 @@ class RfAssessor:
             "state": state,
             "text": RF_TEXT[state],
             "data_quality": quality,
-            "confidence": _confidence_label(conf, quality, self.cfg) if state not in {"DISCONNECTED", "COLLECTING"} else "Insufficient data",
+            "confidence": _confidence_label(conf, quality, self.cfg) if state not in {"NO_DATA", "COLLECTING"} else "Insufficient data",
             "periodicity_score": round(float(telemetry.get("periodicity") or 0.0), 3),
             "features": {
                 "rhythm": scores.get("rhythm"), "focus": scores.get("focus"), "strength": scores.get("strength"),
                 "dominant_rate_per_min": telemetry.get("bpm"), "motion_index": telemetry.get("motion_index"),
                 "packet_rate_hz": (telemetry.get("link") or {}).get("packet_rate_hz"),
+                "packet_loss_ratio": self.loss_ratio(telemetry),
                 "rssi": (telemetry.get("link") or {}).get("rssi"),
             },
             "pattern_seconds": round(now - self._pattern_since, 1) if self._pattern_since is not None else 0.0,
@@ -183,4 +194,6 @@ OBSERVATION_LABELS = {
     "env_elevated": "Environmental sensor reading elevated against baseline",
     "inspection_request": "Operator requested inspection",
     "alert_request": "Operator alert request (keypad *)",
+    "operator_note": "Operator note",
+    "manual": "Incident opened by operator",
 }

@@ -75,8 +75,8 @@ def _csi(state="breathing", rate=100.0, age=0.1, valid=True, conf=0.8):
 
 def test_rf_states_and_sustain():
     rf = RfAssessor()
-    assert rf.assess(_csi(age=None) | {"link": {"total_frames": 0}}, 0)["state"] == "DISCONNECTED"
-    assert rf.assess(_csi(rate=5), 0)["state"] == "LOW_SIGNAL_QUALITY"
+    assert rf.assess(_csi(age=None) | {"link": {"total_frames": 0}}, 0)["state"] == "NO_DATA"
+    assert rf.assess(_csi(rate=5), 0)["state"] == "LOW_QUALITY"
     assert rf.assess(_csi("warming_up", valid=False), 0)["state"] == "COLLECTING"
     assert rf.assess(_csi("empty"), 0)["state"] == "NO_CLEAR_PERIODIC_PATTERN"
     first = rf.assess(_csi(), 100)
@@ -88,7 +88,7 @@ def test_rf_states_and_sustain():
 
 def test_poor_quality_never_reports_pattern():
     out = RfAssessor().assess(_csi(rate=5), 0)
-    assert out["state"] == "LOW_SIGNAL_QUALITY" and out["confidence"] == "Insufficient data"
+    assert out["state"] == "LOW_QUALITY" and out["confidence"] == "Insufficient data"
 
 
 # -- service / incidents / commands ------------------------------------------------
@@ -234,3 +234,113 @@ def test_api_end_to_end_simulation():
         assert client.get("/api/events").json()
         with client.websocket_connect("/ws/live") as ws:
             assert ws.receive_json()["type"] == "jatayu"
+
+
+# -- protocol v1 CSI line, sequence accounting ----------------------------------------
+def _csi1(seq, width=64, flags=1):
+    return f"CSI1,{seq},{seq * 10000},-54,-96,6,{flags}," + ",".join(["20.0"] * width)
+
+
+def test_csi1_parse_and_sequence_gaps_duplicates_reboot():
+    from serial_io import CSIStreamParser
+
+    parser = CSIStreamParser()
+    for seq in (1, 2, 3, 6, 6, 7):
+        frame = parser.parse_line(_csi1(seq), 0.0)
+    assert (frame.seq, frame.channel, frame.noise_floor, frame.first_word_invalid) == (7, 6, -96.0, True)
+    assert len(frame.amplitudes) == 64
+    status = parser.seq.status()
+    assert status["lost"] == 2 and status["gaps"] == 1 and status["duplicates"] == 1 and status["loss_ratio"] == 0.25
+    for seq in (2000, 1, 2):  # board rebooted: counter restarts, not loss
+        parser.parse_line(_csi1(seq), 0.0)
+    assert parser.seq.reboots == 1
+    assert parser.parse_line("CSI1,1,2,3", 0.0) is None and parser.dropped == 1
+    assert parser.parse_line(_csi1(9).replace("20.0", "nan", 1), 0.0) is None  # non-finite amplitude rejected
+
+
+def test_banner_exposes_node_and_resets_sequence():
+    from serial_io import CSIStreamParser
+
+    parser = CSIStreamParser()
+    parser.parse_line(_csi1(5), 0.0)
+    parser.parse_line("#JATAYU,proto=1,node=jatayu_rx_01,fw=3.1,reset=poweron", 0.0)
+    assert parser.device["firmware"]["node"] == "jatayu_rx_01" and parser.seq.last is None
+
+
+def test_legacy_csi_lines_still_parse():
+    from serial_io import CSIStreamParser
+
+    frame = CSIStreamParser().parse_line("CSI,123456,-50," + ",".join(["10.0"] * 64), 0.0)
+    assert frame is not None and frame.seq is None
+
+
+def test_packet_loss_degrades_rf_quality():
+    rf = RfAssessor()
+    base = _csi()
+    lossy = base | {"serial": {"sequence": {"received": 70, "loss_ratio": 0.45}}}
+    out = rf.assess(lossy, 0)
+    assert out["state"] == "LOW_QUALITY" and out["features"]["packet_loss_ratio"] == 0.45
+    fair = base | {"serial": {"sequence": {"received": 90, "loss_ratio": 0.15}}}
+    assert rf.quality(fair) == "fair"
+    assert rf.quality(base | {"serial": {"sequence": {"received": 100, "loss_ratio": 0.0}}}) == "good"
+
+
+def test_state_names_match_engineering_report():
+    assert RfAssessor().assess(_csi(age=None) | {"link": {"total_frames": 0}}, 0)["state"] == "NO_DATA"
+
+
+def test_protocol_version_and_device_defaults():
+    msg = protocol.parse_line('{"type":"hello"}')
+    assert msg["v"] == 1 and msg["device_id"] == "mega_01"
+    with pytest.raises(protocol.ProtocolError):
+        protocol.parse_line('{"type":"hello","v":2}')
+    reading = protocol.parse_line('{"type":"sensor_reading","sensor":"mq_raw","raw_adc":1}')
+    assert reading["sensor_status"] == "unknown"
+
+
+# -- nodes, notes, manual incidents ---------------------------------------------------------
+def test_nodes_store_and_validation_via_service():
+    svc = _service()
+    svc.store.touch_node("rx_01", 100.0, "3.1", 6)
+    node = svc.update_node("rx_01", {"x_m": 1.5, "y_m": 0.0, "z_m": 0.8, "orientation_deg": 90.0, "antenna": "pcb"})
+    assert node["x_m"] == 1.5 and node["antenna"] == "pcb" and node["firmware"] == "3.1" and node["first_seen_at"] == 100.0
+    with pytest.raises(ValueError):
+        svc.store.update_node("rx_01", {"bogus": 1}, 0.0)
+
+
+def test_manual_incident_and_notes():
+    svc = _service()
+    incident = svc.create_incident("North wall check")
+    assert incident["status"] == "open" and incident["observations"][0]["observation_type"] == "manual"
+    noted = svc.add_note(incident["id"], "Debris unstable on east side")
+    assert noted["observations"][-1]["detail"]["text"].startswith("Debris")
+    assert svc.add_note(9999, "x") is None
+    svc.acknowledge(incident["id"])
+    svc.close_incident(incident["id"])
+    assert svc.add_note(incident["id"], "too late") is None
+
+
+def test_api_nodes_notes_and_manual_incident():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "cal.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        created = client.post("/api/incidents", json={"summary": "Corridor B survey"})
+        assert created.status_code == 201
+        iid = created.json()["id"]
+        assert client.post("/api/incidents", json={"summary": "x"}).status_code == 400
+        assert client.post(f"/api/incidents/{iid}/notes", json={"text": "seen movement near vent"}).status_code == 201
+        assert client.post(f"/api/incidents/{iid}/notes", json={"text": ""}).status_code == 400
+        assert client.post("/api/incidents/9999/notes", json={"text": "x"}).status_code == 404
+        assert client.get("/api/incidents").status_code == 200
+        deadline = time.time() + 8
+        while time.time() < deadline and not client.get("/api/nodes").json():
+            time.sleep(0.2)
+        assert client.get("/api/nodes").json()[0]["node_id"] == "sim_rx_01"
+        ok = client.put("/api/nodes/sim_rx_01", json={"x_m": 2, "y_m": 3.5, "z_m": 1, "orientation_deg": 45, "antenna": "pcb"})
+        assert ok.status_code == 200 and ok.json()["y_m"] == 3.5
+        assert client.put("/api/nodes/sim_rx_01", json={"x_m": "far"}).status_code == 400
+        assert client.put("/api/nodes/bad id!", json={"x_m": 1}).status_code in (400, 404)
+        assert client.put("/api/nodes/sim_rx_01", json={}).status_code == 400

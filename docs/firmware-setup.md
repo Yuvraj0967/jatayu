@@ -2,9 +2,11 @@
 
 The receiver firmware is derived from Espressif's official
 [`esp-csi`](https://github.com/espressif/esp-csi) `csi_recv_router` and
-`csi_recv` examples. It changes only the output/alert path: CSI is queued out
-of the Wi-Fi callback, serialized as gain-compensated amplitudes, and it
-accepts `ALERT,1` / `ALERT,0` over the console.
+`csi_recv` examples. It changes only the output path: CSI is queued out of the
+Wi-Fi callback, serialized as gain-compensated amplitudes with a per-packet
+sequence number (protocol v1), and it accepts a few host commands
+(`STATUS`, `PING`, `RESET_GAIN`, `STREAM,0|1`, `MODE,RAW`) over the console.
+See [esp32-node.md](esp32-node.md) for the wire protocol.
 
 Use **ESP-IDF v5.5.x** (the official esp-csi CI covers ESP32-S3 on IDF 5.4/5.5).
 
@@ -69,23 +71,23 @@ program can own the serial port.
 
 ## 4. What you should see
 
-Status lines begin with `#`; data lines are the CSI rows:
+Status lines begin with `#`; data lines are the CSI rows (`CSI1,<seq>,<timestamp_us>,<rssi>,<noise_floor>,<channel>,<flags>,<amplitudes...>`):
 
 ```text
-#JATAYU,fw=3.0,mode=router,ping_hz=100,gain=compensate,...
+#JATAYU,proto=1,node=jatayu_rx_01,role=csi_receiver,chip=esp32s3,fw=3.1,idf=v5.5.x,reset=poweron,mode=router,ping_hz=100,gain=compensate,output=RAW,format=CSI1
 #WIFI,connected,channel=6,bssid=...
 #GAIN,mode=compensate,base_agc=...,base_fft=...
-CSI,123456789,-47,31.0,35.2,42.1,...
+CSI1,1,123456789,-47,-96,6,0,31.0,35.2,42.1,...
 ```
 
 The firmware waits for ~100 packets of AGC baseline before emitting CSI rows,
 so the first second is status-only. The backend turns the `#WIFI` reason codes
 into plain-language hints on the dashboard if the board cannot join Wi-Fi.
 
-## Receiver options (menuconfig → RescueSense)
+## Receiver options (menuconfig → JATAYU)
 
 Build-time options, set in `firmware\main\Kconfig.projbuild` or
-`idf.py menuconfig → RescueSense`:
+`idf.py menuconfig → JATAYU`:
 
 - **Router vs. dedicated transmitter** — router mode (default) pings the AP at
   100 Hz. Disable it to use a second ESP32 running stock `csi_send`.
@@ -93,7 +95,7 @@ Build-time options, set in `firmware\main\Kconfig.projbuild` or
   subcarriers so the host never sees mixed widths.
 - **Gain handling** — *compensate* (default, Espressif's recommended AGC
   correction), *force* (lock gain at the baseline), or *off*.
-- **Buzzer GPIO** (default 4) and **alert timeout** (default 20 s).
+- **Node ID** (default `jatayu_rx_01`) — reported in the banner and every health line.
 
 ## Two-board fallback
 

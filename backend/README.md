@@ -1,15 +1,17 @@
-# RescueSense backend
+# JATAYU backend
 
-The laptop-side CSI pipeline and WebSocket server. It reads the compact ESP32-S3
-stream, runs the breathing-detection DSP, serves the dashboard, and relays
-alert commands back to the board.
+The CSI pipeline and WebSocket/REST server. It runs on a laptop or on the
+Raspberry Pi 4B (it is light enough; the JATAYU layer below adds the Arduino
+link, SQLite, incidents and fusion). It reads the ESP32-S3 stream, runs the
+periodic-pattern DSP and serves the dashboard.
 
 ```text
-CSI,<timestamp_us>,<rssi>,<amp_sc0>,<amp_sc1>,...
+CSI1,<seq>,<timestamp_us>,<rssi>,<noise_floor>,<channel>,<flags>,<amp_sc0>,<amp_sc1>,...
 ```
 
-It also accepts the stock ESP-IDF `CSI_DATA,...,"[imag,real,...]"` output from
-the `csi_recv` examples.
+The sequence number lets the backend measure packet loss, duplicates and
+reboots exactly. It also accepts the legacy `CSI,<timestamp_us>,<rssi>,<amps>`
+rows and the stock ESP-IDF `CSI_DATA,...,"[imag,real,...]"` output.
 
 ## Run it
 
@@ -26,7 +28,6 @@ Then:
 python app.py               # auto-detect the ESP32 port, serve the dashboard
 python app.py --serial-port COM9
 python app.py --simulate    # hardware-free, clearly badged "not real data"
-python app.py --auto-alert  # buzzer follows detections
 python app.py --list-ports  # show candidate serial ports and exit
 python app.py --model presence_model.joblib   # optional trained model
 ```
@@ -38,7 +39,7 @@ Dependencies are intentionally small: `starlette`, `uvicorn`, `pyserial`,
 `numpy`, `scipy` (`requirements.txt`). `scikit-learn` is only needed for the
 optional presence model (`requirements-ml.txt`).
 
-## WebSocket + alert contract
+## WebSocket + alert contract (software alert only)
 
 Connect to `ws://127.0.0.1:8000/ws`; the dashboard does this automatically. One
 telemetry object arrives per second with `state`, `bpm`, `confidence`,
@@ -48,13 +49,14 @@ telemetry object arrives per second with `state`, `bpm`, `confidence`,
 Commands are JSON messages:
 
 ```js
-socket.send(JSON.stringify({ type: "alert", active: true }));        // buzzer on
+socket.send(JSON.stringify({ type: "alert", active: true }));        // software alert (logged; no buzzer)
 socket.send(JSON.stringify({ type: "calibration", action: "start", kind: "empty", duration_seconds: 30 }));
 socket.send(JSON.stringify({ type: "calibration", action: "start", kind: "distance", distance_m: 2, duration_seconds: 30 }));
 ```
 
-The backend writes exactly `ALERT,1\n` / `ALERT,0\n` to the ESP32, and re-sends
-the current state every 5 s as a heartbeat. The equivalent REST call:
+The alert is a logged software state only. The JATAYU firmware has no buzzer, so
+nothing is sent to the ESP32 and the dashboard says so; the backend sends the
+ESP32 a `PING` every 5 s as a liveness probe. The equivalent REST call:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/alert -ContentType application/json -Body '{"active":true}'
@@ -126,7 +128,7 @@ are counted and dropped. The Pi owns the key-to-action map.
 `/api/sensors/rebaseline`; simulation only: `POST /api/simulate/key`, `/api/simulate/gas`.
 Live updates on `ws://host:8000/ws/live` (state snapshot each second plus every event).
 
-**Semantics.** RF states: DISCONNECTED, COLLECTING, INSUFFICIENT_DATA, LOW_SIGNAL_QUALITY,
+**Semantics.** RF states: NO_DATA, COLLECTING, INSUFFICIENT_DATA, LOW_QUALITY,
 NO_CLEAR_PERIODIC_PATTERN, PERIODIC_PATTERN_OBSERVED, REVIEW_RECOMMENDED (pattern held
 >= 20 s), reported with a separate data-quality grade and qualitative confidence. Gas
 is raw ADC counts against a self-measured baseline after warm-up (never ppm). Incidents

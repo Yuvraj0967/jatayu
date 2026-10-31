@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+PROTOCOL_VERSION = 1
 LCD_COLUMNS = 16
 MAX_LINE_BYTES = 512
 
@@ -73,6 +74,10 @@ def parse_line(line: bytes | str) -> dict[str, Any]:
         raise ProtocolError("not a JSON object")
 
     kind = _require(msg, "type", (str,))
+    version = msg.setdefault("v", PROTOCOL_VERSION)
+    if version != PROTOCOL_VERSION or isinstance(version, bool):
+        raise ProtocolError(f"unsupported protocol version {version!r}")
+    msg.setdefault("device_id", "mega_01")
     if "seq" in msg:
         _require(msg, "seq", (int,))
 
@@ -84,6 +89,7 @@ def parse_line(line: bytes | str) -> dict[str, Any]:
         msg.setdefault("model", "UNKNOWN")
         msg.setdefault("calibration", "NOT_CALIBRATED")
         msg.setdefault("unit", "adc_counts")
+        msg.setdefault("sensor_status", "unknown")
     elif kind == "key_event":
         key = _require(msg, "key", (str,))
         if key not in VALID_KEYS:

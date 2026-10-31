@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0e13">
-  <title>RescueSense Console</title>
+  <title>JATAYU Console</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0e13'/%3E%3Cpath d='M4 17h6l2.5-6 4 12 3-9 2 3H28' fill='none' stroke='%2334d399' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -266,19 +266,19 @@
   </style>
 </head>
 <body>
-  <div class="alert-banner" role="alert"><span>●</span> <span id="alertBannerText">Survivor alert active.</span></div>
+  <div class="alert-banner" role="alert"><span>●</span> <span id="alertBannerText">Operator alert active.</span></div>
   <header class="topbar">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#151b24" stroke="rgba(148,170,196,.25)"/><path d="M4 17h6l2.5-6 4 12 3-9 2 3H28" fill="none" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <div style="min-width:0">
-        <div class="brand-name">RescueSense</div>
-        <div class="brand-sub">Camera-free breathing detection over Wi-Fi CSI</div>
+        <div class="brand-name">JATAYU</div>
+        <div class="brand-sub">RF observation and incident coordination (experimental)</div>
       </div>
     </div>
     <div class="link-pill" id="linkPill" aria-live="polite"><span class="dot" id="linkDot"></span><span id="linkText">Connecting to backend…</span></div>
     <button class="btn alert" id="alertBtn" type="button" disabled>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-      <span id="alertLabel">Sound alert</span>
+      <span id="alertLabel">Raise alert</span>
     </button>
     <button class="btn icon" id="settingsBtn" type="button" aria-label="Connection settings" aria-expanded="false">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -295,13 +295,13 @@
     <div class="grid">
       <!-- A signal-driven visualisation, never a camera or pose reconstruction. -->
       <section class="card scene-card" id="sceneCard" aria-labelledby="sceneTitle">
-        <canvas id="sceneCanvas" aria-label="Three-dimensional Wi-Fi CSI signal projection showing the receiver, range rings, an obstacle, and a breathing-signal target when detected"></canvas>
+        <canvas id="sceneCanvas" aria-label="Three-dimensional Wi-Fi CSI signal projection showing the receiver, range rings, an obstacle, and a schematic pattern marker when a periodic RF pattern is observed"></canvas>
         <div class="scene-head">
-          <div><div class="scene-eyebrow">Spatial signal view</div><div class="scene-title" id="sceneTitle">CSI breathing projection</div></div>
+          <div><div class="scene-eyebrow">Spatial signal view</div><div class="scene-title" id="sceneTitle">CSI signal projection</div></div>
           <div style="display:flex; gap:8px; align-items:flex-start"><div class="scene-readouts" aria-label="Spatial target telemetry"><div><b id="sceneRate">--</b><span>rate</span></div><div><b id="sceneDistance">--</b><span>range</span></div><div><b id="sceneConfidence">--</b><span>confidence</span></div></div><div class="scene-status" id="sceneStatus">Awaiting signal</div></div>
         </div>
         <div class="scene-foot">
-          <p id="sceneDetail">A target appears only when the CSI pipeline reports a breathing-like periodic signal. This is not camera or pose tracking.</p>
+          <p id="sceneDetail">A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.</p>
           <div class="scene-key" aria-label="Projection legend"><span class="rx"><i></i>receiver</span><span class="wall"><i></i>obstacle</span><span class="target"><i></i>signal target</span></div>
         </div>
       </section>
@@ -310,12 +310,12 @@
         <div style="position:relative; min-width:0">
           <span class="chip" id="stateChip"><span class="dot"></span><span id="stateChipText">CONNECTING</span></span>
           <h1 class="state-title" id="stateTitle" aria-live="polite">Connecting…</h1>
-          <p class="state-detail" id="stateDetail">Waiting for the RescueSense backend.</p>
+          <p class="state-detail" id="stateDetail">Waiting for the JATAYU backend.</p>
           <div class="progress" id="stateProgress" hidden><span></span></div>
           <div class="readouts">
             <div>
               <div class="bpm-value" id="bpmValue">—</div>
-              <div class="bpm-unit">breaths per minute</div>
+              <div class="bpm-unit">cycles per minute (candidate rate)</div>
             </div>
             <div class="sub-readout">
               <div class="v" id="sinceValue">--</div>
@@ -323,9 +323,9 @@
             </div>
           </div>
           <div class="scores" aria-label="Detection evidence">
-            <div class="score" title="Does the signal repeat at a breathing period? (autocorrelation)"><span class="name">Rhythm</span><span class="bar"><span id="scoreRhythm"></span></span><span class="pct" id="pctRhythm">0%</span></div>
-            <div class="score" title="Is the energy concentrated at one breathing rate? (spectral focus)"><span class="name">Focus</span><span class="bar"><span id="scoreFocus"></span></span><span class="pct" id="pctFocus">0%</span></div>
-            <div class="score" title="Is the breathing-band signal stronger than the empty-room background?"><span class="name">Strength</span><span class="bar"><span id="scoreStrength"></span></span><span class="pct" id="pctStrength">0%</span></div>
+            <div class="score" title="Does the signal repeat at a consistent period? (autocorrelation)"><span class="name">Rhythm</span><span class="bar"><span id="scoreRhythm"></span></span><span class="pct" id="pctRhythm">0%</span></div>
+            <div class="score" title="Is the energy concentrated at one rate? (spectral focus)"><span class="name">Focus</span><span class="bar"><span id="scoreFocus"></span></span><span class="pct" id="pctFocus">0%</span></div>
+            <div class="score" title="Is the respiration-band signal stronger than the empty-room background?"><span class="name">Strength</span><span class="bar"><span id="scoreStrength"></span></span><span class="pct" id="pctStrength">0%</span></div>
           </div>
         </div>
         <div class="hero-side">
@@ -337,12 +337,12 @@
       <!-- Breathing waveform -->
       <section class="card span-7" aria-labelledby="waveTitle">
         <div class="card-head">
-          <h2 class="card-title" id="waveTitle">Breathing signal</h2>
+          <h2 class="card-title" id="waveTitle">Periodic component</h2>
           <label class="toggle"><input type="checkbox" id="rawToggle"> show raw CSI</label>
         </div>
         <canvas class="chart" id="wave" role="img" aria-label="Live breathing waveform for the last 30 seconds"></canvas>
         <div class="legend">
-          <span><i id="waveLegendSwatch" style="background:var(--ok)"></i>Breathing component (0.07–0.7 Hz)</span>
+          <span><i id="waveLegendSwatch" style="background:var(--ok)"></i>Respiration-band component (0.07–0.7 Hz)</span>
           <span><i style="background:#6b7a8b"></i>Raw combined CSI</span>
           <span class="num" id="waveMeta">--</span>
         </div>
@@ -356,7 +356,7 @@
 
       <!-- Spectrum -->
       <section class="card span-4" aria-labelledby="specTitle">
-        <div class="card-head"><h2 class="card-title" id="specTitle">Breathing spectrum</h2><span class="card-note num" id="specNote">--</span></div>
+        <div class="card-head"><h2 class="card-title" id="specTitle">Spectrum</h2><span class="card-note num" id="specNote">--</span></div>
         <canvas class="chart" id="spectrum" role="img" aria-label="Spectrum of the breathing signal with the detected rate marked"></canvas>
       </section>
 
@@ -371,7 +371,7 @@
         <div class="card-head"><h2 class="card-title" id="tlTitle">Detection timeline</h2><span class="card-note">last 3 minutes · dashed line = detection threshold</span></div>
         <canvas class="chart" id="timeline" role="img" aria-label="Confidence and state over the last three minutes"></canvas>
         <div class="legend">
-          <span><i style="background:var(--ok)"></i>Breathing</span>
+          <span><i style="background:var(--ok)"></i>Periodic pattern</span>
           <span><i style="background:var(--idle)"></i>Clear</span>
           <span><i style="background:var(--warn)"></i>Movement</span>
           <span><i style="background:var(--info)"></i>Warming up</span>
@@ -434,7 +434,7 @@
     </div>
 
     <div class="footer">
-      <span>Single-link Wi-Fi CSI. Shows a breathing-like periodic signal and an estimated proximity, not a medical measurement or a confirmed survivor.</span>
+      <span>Experimental single-link Wi-Fi CSI. A periodic RF pattern is an observation for operator review, not proof of a person or breathing, and the proximity figure is an uncalibrated estimate. Not a medical or life-safety instrument.</span>
       <span class="num" id="footerClock">--</span>
     </div>
   </main>
@@ -454,8 +454,8 @@
       line: 'rgba(148,170,196,.10)', lineStrong: 'rgba(148,170,196,.20)', surface: color('--surface'), bg: color('--bg'),
     };
     const STATES = {
-      breathing: { chip: 'BREATHING', title: 'Breathing detected', color: C.ok },
-      empty: { chip: 'CLEAR', title: 'No breathing detected', color: C.idle },
+      breathing: { chip: 'PATTERN', title: 'Periodic RF pattern observed', color: C.ok },
+      empty: { chip: 'NO PATTERN', title: 'No clear periodic pattern', color: C.idle },
       motion: { chip: 'MOVEMENT', title: 'Movement detected', color: C.warn },
       warming_up: { chip: 'WARMING UP', title: 'Collecting signal', color: C.info },
       no_signal: { chip: 'NO SIGNAL', title: 'No signal from the sensor', color: C.bad },
@@ -600,7 +600,7 @@
       if (wifi && wifi.state === 'disconnected') return `ESP32 cannot join Wi-Fi: ${wifi.reason_text || 'unknown reason'}. Check the SSID/password in firmware/sdkconfig.wifi and that the hotspot is 2.4 GHz.`;
       if (wifi && wifi.state === 'connecting') return `ESP32 is connecting to "${wifi.ssid || 'Wi-Fi'}"…`;
       if (s.state === 'searching' || s.state === 'error' || s.state === 'reconnecting') return s.error;
-      if (s.state === 'open') return `${s.port} is open but no CSI rows are arriving. Is the RescueSense firmware flashed, and is idf.py monitor closed?`;
+      if (s.state === 'open') return `${s.port} is open but no CSI rows are arriving. Is the JATAYU firmware flashed, and is idf.py monitor closed?`;
       return null;
     }
 
@@ -721,11 +721,11 @@
       view.alert = !!active;
       document.body.classList.toggle('alerting', view.alert);
       $('alertBtn').classList.toggle('on', view.alert);
-      $('alertLabel').textContent = view.alert ? 'Stop alert' : 'Sound alert';
-      $('alertBtn').title = delivered === false ? 'Command not delivered: no serial link to the ESP32' : '';
+      $('alertLabel').textContent = view.alert ? 'Clear alert' : 'Raise alert';
+      $('alertBtn').title = 'Software alert: logged and shown on the dashboard. This build has no buzzer.';
       const simulated = view.data && view.data.source === 'simulation';
-      $('alertBannerText').textContent = `Survivor alert active. ${
-        delivered ? 'The ESP32 buzzer is sounding.' : simulated ? 'Simulation: no buzzer is connected.' : 'Buzzer command NOT delivered: no serial link to the ESP32.'}`;
+      $('alertBannerText').textContent = `Operator alert active. ${
+        'Software alert only: logged for the operator. This build has no buzzer.'}`;
     }
     $('alertBtn').addEventListener('click', () => send({ type: 'alert', active: !view.alert }));
 
@@ -763,7 +763,7 @@
       if (!view.connected || !data) {
         rate.textContent = '--'; distance.textContent = '--'; confidence.textContent = '--';
         status.textContent = 'Awaiting signal';
-        detail.textContent = 'A target appears only when the CSI pipeline reports a breathing-like periodic signal. This is not camera or pose tracking.';
+        detail.textContent = 'A marker appears only when the CSI pipeline reports a periodic RF pattern. It is a schematic marker, not a person, camera or pose tracking.';
         return;
       }
       const simulated = data.source === 'simulation' ? 'Simulation · ' : '';
@@ -771,16 +771,16 @@
       distance.textContent = data.distance_m != null ? `${Number(data.distance_m).toFixed(1)} m` : 'uncal.';
       confidence.textContent = pct(data.confidence);
       if (data.state === 'breathing') {
-        status.textContent = `${simulated}Breathing signal`;
+        status.textContent = `${simulated}Periodic RF pattern`;
         const rate = data.bpm != null ? `${Number(data.bpm).toFixed(1)} BPM` : 'periodic component';
         const distance = data.distance_m != null ? ` · estimated ${Number(data.distance_m).toFixed(1)} m` : '';
-        detail.textContent = `${rate}${distance}. The figure marks the estimated signal target only; it is not a recovered person image or skeleton.`;
+        detail.textContent = `${rate}${distance}. The marker is schematic only; it is not evidence of a person and not a recovered image or skeleton.`;
       } else if (data.state === 'motion') {
         status.textContent = `${simulated}Motion filtered`;
-        detail.textContent = 'Movement is present, so the breathing target is withheld until the signal settles.';
+        detail.textContent = 'Movement is present, so the pattern marker is withheld until the signal settles.';
       } else {
         status.textContent = `${simulated}${data.state === 'warming_up' ? 'Analysing CSI' : 'No target'}`;
-        detail.textContent = 'No qualified breathing-like periodic signal is currently available, so no person projection is shown.';
+        detail.textContent = 'No qualified periodic RF pattern is currently available, so no marker is shown.';
       }
     }
 
@@ -1183,7 +1183,7 @@
     // Debug hook: lets you inject a telemetry object from the console.
     window.RescueSense = { inject: onTelemetry, view };
 
-    setState('connecting', 'Waiting for the RescueSense backend.');
+    setState('connecting', 'Waiting for the JATAYU backend.');
     updateProjectionStatus(); initProjection();
     redrawStatic(); updateClock(); connect(); requestAnimationFrame(loop);
   })();

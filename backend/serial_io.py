@@ -139,10 +139,58 @@ class ClockAligner:
         return device_s + self._offset
 
 
+class SequenceTracker:
+    """Gap, duplicate and reboot accounting for the firmware's per-packet sequence number.
+
+    seq is assigned before the firmware's queue, so a gap means a packet was
+    lost between the radio and this host (queue overflow, serial stall or
+    corrupted line). A seq that moves backwards by a lot means the board
+    rebooted; that is counted separately and is not a loss.
+    """
+
+    def __init__(self) -> None:
+        self.last: int | None = None
+        self.received = 0
+        self.gaps = 0
+        self.lost = 0
+        self.duplicates = 0
+        self.reboots = 0
+        self.max_gap = 0
+
+    def observe(self, seq: int) -> None:
+        self.received += 1
+        if self.last is not None:
+            delta = seq - self.last
+            if delta == 0:
+                self.duplicates += 1
+                return
+            if delta < 0:
+                if self.last - seq > 1000:  # counter restarted
+                    self.reboots += 1
+                else:  # a late/out-of-order line; do not count it as loss
+                    self.duplicates += 1
+                    return
+            elif delta > 1:
+                self.gaps += 1
+                self.lost += delta - 1
+                self.max_gap = max(self.max_gap, delta - 1)
+        self.last = seq
+
+    @property
+    def loss_ratio(self) -> float:
+        expected = self.received + self.lost
+        return self.lost / expected if expected else 0.0
+
+    def status(self) -> dict[str, Any]:
+        return {"received": self.received, "lost": self.lost, "gaps": self.gaps, "duplicates": self.duplicates,
+                "reboots": self.reboots, "max_gap": self.max_gap, "loss_ratio": round(self.loss_ratio, 4)}
+
+
 class CSIStreamParser:
     """Accepts RescueSense compact CSI and stock Espressif CSI_DATA lines.
 
-    Compact (this firmware):  CSI,<timestamp_us>,<rssi>,<amp0>,<amp1>,...
+    Protocol v1 (this firmware): CSI1,<seq>,<timestamp_us>,<rssi>,<noise>,<channel>,<flags>,<amp0>,...
+    Legacy compact:           CSI,<timestamp_us>,<rssi>,<amp0>,<amp1>,...
     Stock esp-csi examples:   CSI_DATA,...,<rssi at 3>,...,<local_timestamp at 18>,...,"[i,r,...]"
     Lines starting with '#' and ESP-IDF log lines are kept as device messages.
     """
@@ -156,6 +204,7 @@ class CSIStreamParser:
         self.other_lines = 0
         self.last_error: str | None = None
         self.device: dict[str, Any] = {}
+        self.seq = SequenceTracker()
 
     def parse_line(self, line: str | bytes, host_now: float | None = None) -> CSIFrame | None:
         if isinstance(line, bytes):
@@ -163,10 +212,12 @@ class CSIStreamParser:
         text = line.strip().lstrip("﻿")
         if not text:
             return None
-        if text.startswith("CSI,") or text.startswith("CSI_DATA,"):
+        if text.startswith(("CSI,", "CSI1,", "CSI_DATA,")):
             try:
                 row = next(csv.reader([text], skipinitialspace=True))
-                if row[0] == "CSI":
+                if row[0] == "CSI1":
+                    frame = self._parse_v1(row[1:], host_now)
+                elif row[0] == "CSI":
                     frame = self._parse_compact(row[1:], host_now)
                 else:
                     frame = self._parse_stock(row, host_now)
@@ -182,6 +233,22 @@ class CSIStreamParser:
         if self.on_message is not None and len(text) < 400:
             self.on_message(text)
         return None
+
+    def _parse_v1(self, values: list[str], host_now: float | None) -> CSIFrame:
+        if len(values) < 16:
+            raise ValueError("CSI1 line is truncated")
+        seq = int(values[0])
+        timestamp_us = float(values[1])
+        rssi = float(values[2])
+        noise = float(values[3])
+        channel = int(values[4])
+        flags = int(values[5])
+        amplitudes = np.asarray([float(value) for value in values[6:] if value.strip()], dtype=float)
+        if not np.all(np.isfinite(amplitudes)):
+            raise ValueError("CSI1 line has non-numeric amplitudes")
+        self.seq.observe(seq)
+        return CSIFrame(self.compact_clock.to_host(timestamp_us, host_now), rssi, amplitudes, seq=seq,
+                        channel=channel, noise_floor=noise, first_word_invalid=bool(flags & 1))
 
     def _parse_compact(self, values: list[str], host_now: float | None) -> CSIFrame:
         if len(values) < 10:
@@ -227,6 +294,8 @@ class CSIStreamParser:
             self.device["stats_at"] = time.monotonic()
         elif kind in {"JATAYU", "RESCUESENSE"}:
             self.device["firmware"] = values
+            # A fresh banner means the board (re)booted: restart sequence accounting.
+            self.seq.last = None
         elif kind == "WIFI":
             state = flags[0] if flags else "unknown"
             wifi = {"state": state, **values}
@@ -303,10 +372,14 @@ class SerialCSIReader:
 
     # -- public API ------------------------------------------------------
     def send_alert(self, active: bool) -> bool:
-        """Firmware contract: `ALERT,1\\n` starts the buzzer, `ALERT,0\\n` stops it."""
+        """JATAYU firmware has no buzzer, so nothing is sent to the board.
+
+        Returns False ("not delivered to hardware"). The operator alert still
+        exists as a logged software state; see RescueRuntime.set_alert.
+        """
 
         self._alert_wanted = bool(active)
-        return self._write(b"ALERT,1\n" if active else b"ALERT,0\n")
+        return False
 
     def status(self) -> dict[str, Any]:
         now = time.monotonic()
@@ -321,6 +394,8 @@ class SerialCSIReader:
             "parse_errors": self.parser.dropped,
             "last_frame_age_s": round(now - self.last_frame_at, 1) if self.last_frame_at else None,
             "clock_resyncs": self.parser.compact_clock.resyncs + self.parser.stock_clock.resyncs,
+            "sequence": self.parser.seq.status(),
+            "node_id": self.parser.device.get("firmware", {}).get("node"),
             "device": self.parser.device,
             "messages": list(self.messages)[-12:],
         }
@@ -434,9 +509,9 @@ class SerialCSIReader:
                 self._rate_started = now
                 self.state = "streaming" if self.rate_hz > 0 else "open"
             if now - last_heartbeat >= self.HEARTBEAT_SECONDS:
-                # Re-sending the wanted state keeps the firmware's alert
-                # watchdog fed and re-applies it after a board reset.
-                self._write(b"ALERT,1\n" if self._alert_wanted else b"ALERT,0\n")
+                # Liveness probe: the firmware answers PING with #PONG, which
+                # proves the host-to-board direction works.
+                self._write(b"PING\n")
                 last_heartbeat = now
 
 

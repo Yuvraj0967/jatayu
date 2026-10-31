@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Make sure a Python environment can run the RescueSense backend.
+  Make sure a Python environment can run the JATAYU backend.
 
 .DESCRIPTION
   If any installed Python already has the packages (starlette, uvicorn,

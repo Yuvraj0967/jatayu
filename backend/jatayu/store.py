@@ -80,6 +80,19 @@ CREATE TABLE IF NOT EXISTS commands (
     acknowledged_at REAL,
     failure TEXT
 );
+CREATE TABLE IF NOT EXISTS nodes (
+    node_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'csi_receiver',
+    x_m REAL, y_m REAL, z_m REAL,
+    orientation_deg REAL,
+    antenna TEXT,
+    notes TEXT,
+    firmware TEXT,
+    channel INTEGER,
+    source TEXT NOT NULL DEFAULT 'live',
+    first_seen_at REAL NOT NULL,
+    last_seen_at REAL
+);
 CREATE TABLE IF NOT EXISTS operator_acknowledgements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     incident_id INTEGER NOT NULL REFERENCES incidents(id),
@@ -250,6 +263,31 @@ class Store:
             (incident_id, action, notes, channel, now),
         )
         return int(cur.lastrowid)
+
+    # -- nodes (deployment metadata; groundwork for the multi-node Sensing Bubble) --------
+    NODE_FIELDS = ("role", "x_m", "y_m", "z_m", "orientation_deg", "antenna", "notes")
+
+    def touch_node(self, node_id: str, now: float, firmware: str | None = None, channel: int | None = None,
+                   source: str = "live") -> None:
+        self._exec(
+            """INSERT INTO nodes(node_id, firmware, channel, source, first_seen_at, last_seen_at) VALUES(?,?,?,?,?,?)
+               ON CONFLICT(node_id) DO UPDATE SET last_seen_at=excluded.last_seen_at,
+               firmware=COALESCE(excluded.firmware, firmware), channel=COALESCE(excluded.channel, channel)""",
+            (node_id, firmware, channel, source, now, now),
+        )
+
+    def update_node(self, node_id: str, fields: dict[str, Any], now: float) -> dict[str, Any]:
+        self._exec("INSERT OR IGNORE INTO nodes(node_id, first_seen_at) VALUES(?,?)", (node_id, now))
+        for key, value in fields.items():
+            if key not in self.NODE_FIELDS:
+                raise ValueError(f"unknown node field '{key}'")
+            self._exec(f"UPDATE nodes SET {key}=? WHERE node_id=?", (value, node_id))
+        return self.nodes(node_id)[0]
+
+    def nodes(self, node_id: str | None = None) -> list[dict[str, Any]]:
+        if node_id:
+            return self._rows("SELECT * FROM nodes WHERE node_id=?", (node_id,))
+        return self._rows("SELECT * FROM nodes ORDER BY node_id")
 
     # -- commands ---------------------------------------------------------------
     def save_command(self, cmd: dict[str, Any]) -> None:

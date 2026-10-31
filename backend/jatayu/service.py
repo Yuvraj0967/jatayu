@@ -39,7 +39,7 @@ class JatayuService:
         self.last_arduino_at: float | None = None
         self.arduino_online = False
         self.csi_online = False
-        self.rf_state: dict[str, Any] = {"state": "DISCONNECTED"}
+        self.rf_state: dict[str, Any] = {"state": "NO_DATA"}
         self.gas_state: dict[str, Any] = {}
         self.tick_ms = 0.0
         self._last_rf_state: str | None = None
@@ -179,6 +179,30 @@ class JatayuService:
             self._emit("INCIDENT_CLOSED", "operator", {"notes": notes}, incident_id)
             return self.store.incident_detail(incident_id)
 
+    def create_incident(self, summary: str, actor: str = "operator") -> dict[str, Any]:
+        with self.lock:
+            now = time.time()
+            incident = self.store.create_incident(summary.strip(), now, self.source)
+            self.store.add_incident_observation(incident["id"], "manual", None, {"summary": summary.strip()}, now)
+            self._emit("INCIDENT_CREATED", actor, {"code": incident["incident_code"], "manual": True}, incident["id"])
+            return self.store.incident_detail(incident["id"])  # type: ignore[return-value]
+
+    def add_note(self, incident_id: int, text: str, actor: str = "operator") -> dict[str, Any] | None:
+        with self.lock:
+            incident = self.store.incident(incident_id)
+            if incident is None or incident["status"] == "closed":
+                return None
+            now = time.time()
+            self.store.add_incident_observation(incident_id, "operator_note", None, {"text": text}, now)
+            self._emit("INCIDENT_NOTE_ADDED", actor, {"text": text}, incident_id)
+            return self.store.incident_detail(incident_id)
+
+    def update_node(self, node_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+        with self.lock:
+            node = self.store.update_node(node_id, fields, time.time())
+            self._emit("NODE_UPDATED", "operator", {"node_id": node_id, "fields": sorted(fields)})
+            return node
+
     def display(self, line1: str, line2: str = "") -> dict[str, Any]:
         msg = protocol.display_message(line1, line2)
         return self.commands.issue("LCD_SHOW", msg and {"line1": msg["line1"], "line2": msg["line2"]},
@@ -214,13 +238,18 @@ class JatayuService:
         with self.lock:
             rf = self.rf.assess(csi_telemetry, now)
             self.rf_state = rf
-            online = rf["state"] != "DISCONNECTED"
+            online = rf["state"] != "NO_DATA"
             if online != self.csi_online:
                 self.csi_online = online
                 self.store.upsert_device("esp32", "online" if online else "offline", None, now if online else None)
                 self._emit("ESP32_CONNECTED" if online else "ESP32_DISCONNECTED", "backend")
+            serial = csi_telemetry.get("serial") or {}
+            node_id = serial.get("node_id") or ("sim_rx_01" if self.simulated and online else None)
+            if node_id and online:
+                firmware = ((serial.get("device") or {}).get("firmware") or {}).get("fw")
+                self.store.touch_node(node_id, now, firmware, (rf.get("features") or {}).get("channel"), self.source)
             if rf["state"] != self._last_rf_state or now - self._last_rf_store >= 10.0:
-                if rf["state"] not in {"DISCONNECTED"}:
+                if rf["state"] not in {"NO_DATA"}:
                     obs_id = self.store.add_rf_observation(rf["state"], rf["data_quality"], rf["confidence"],
                                                            rf["periodicity_score"], rf["features"], now, self.source)
                     self._last_rf_store = now

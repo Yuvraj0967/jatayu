@@ -1,62 +1,75 @@
-# RescueSense architecture
+# JATAYU architecture
+
+JATAYU is a stationary, local-first, edge-computing platform for organising RF and
+environmental observations in hazardous or inaccessible spaces, with an auditable
+human review workflow. It is a decision-support and experimental sensing prototype: it
+does not identify survivors, certify an environment as safe, or give exact positions or depth.
 
 ```mermaid
 flowchart LR
-    TX["2.4 GHz AP/hotspot\nor optional ESP32 csi_send @ 100 Hz"] -->|"Wi-Fi packets"| RX["ESP32-S3 CSI receiver\nofficial esp-csi-derived firmware"]
-    RX -->|"USB serial\nCSI,timestamp_us,rssi,amplitudes..."| DSP["FastAPI + NumPy/SciPy\nserial ingest → CSI DSP → calibration"]
-    DSP -->|"WebSocket JSON every 1 s"| UI["Three.js dashboard\n3D range scene + plots"]
-    UI -->|"WebSocket alert command"| DSP
-    DSP -->|"ALERT,1 / ALERT,0 serial"| RX
-    RX -->|"red pulse + buzzer"| ALERT["Local survivor alert"]
+    AP["2.4 GHz router / known transmitter"] -->|Wi-Fi packets| RX["ESP32-S3 CSI node"]
+    RX -->|"USB serial\nCSI1 lines (protocol v1)"| PI["Raspberry Pi 4B\nbackend + DSP + SQLite"]
+    MEGA["Arduino Mega\nMQ sensor, keypad, LCD"] <-->|"USB serial\nNDJSON"| PI
+    PI -->|"WebSocket / REST"| UI["Operator dashboard\n(laptop / phone)"]
 ```
 
-The receiver does only RF acquisition, compact magnitude conversion, and alert I/O. The laptop owns filtering, PCA, spectral estimation, calibration, and the user interface. This keeps the ESP32 Wi-Fi callback short and makes demo-day tuning fast.
+## Responsibilities
 
-## Signal path
+| Component | Does | Does not |
+| --- | --- | --- |
+| ESP32-S3 | Capture CSI, gain-compensate, add seq/channel/noise/flags, stream raw over USB, report health | Interpret CSI, store, decide |
+| Arduino Mega | Read MQ raw ADC, scan keypad, drive LCD, ack commands | Fusion or decisions |
+| Raspberry Pi | Parse/validate both streams, CSI DSP, quality grading, rule-based fusion, SQLite, incidents, API, dashboard | Claim a person is present |
 
-1. The ESP32-S3 receives repeatable Wi-Fi packets from a 2.4 GHz router/hotspot or the official `csi_send` example.
-2. Firmware filters to the expected BSSID/MAC, copies CSI out of the Wi-Fi callback into a FreeRTOS queue, calculates complex magnitude in a lower-priority task, and emits `CSI,timestamp_us,rssi,amp...` at roughly 100 Hz.
-3. The backend drops stray-width/corrupted packets, masks invalid/guard subcarriers, averages to 10 Hz, whitens each carrier by its own noise level, removes residual gain steps, rejects windows with gross body movement, and selects the **most periodic** PCA component across subcarriers.
-4. Every one-second hop, a 30-second window is band-passed and analyzed with Welch/FFT. The backend estimates BPM, peak-to-band confidence, presence, and a calibrated estimated proximity with uncertainty.
-5. The dashboard consumes one telemetry object per second. It animates a human marker with the estimated respiratory phase and renders alert state, waveform, and spectrum.
+## Signal path (single node)
 
-## Deliverable tree
+1. The ESP32-S3 receives packets from a 2.4 GHz router (pinged at ~100 Hz) or a second ESP32 running `csi_send`.
+2. Firmware filters to the expected BSSID, copies CSI out of the Wi-Fi callback into a bounded queue, and emits `CSI1,<seq>,<ts>,<rssi>,<noise>,<ch>,<flags>,<amps>` (see [esp32-node.md](esp32-node.md)).
+3. The backend drops stray-width/corrupt packets, masks invalid/guard subcarriers, averages to 10 Hz, whitens per subcarrier, removes residual gain steps, rejects gross-movement windows, and picks the most periodic PCA component.
+4. Each second a 30 s window is band-passed and scored on rhythm, focus and strength. Packet loss measured from `seq` degrades the data-quality grade.
+5. `jatayu/fusion.py` maps this to RF states and a quality grade (below); the gas channel is assessed separately in raw ADC counts.
+6. Observations are grouped into incidents; every operator action and device command is an auditable event in SQLite.
+
+## RF states and quality
+
+`NO_DATA`, `COLLECTING`, `INSUFFICIENT_DATA`, `LOW_QUALITY`, `NO_CLEAR_PERIODIC_PATTERN`,
+`PERIODIC_PATTERN_OBSERVED`, `REVIEW_RECOMMENDED` (pattern sustained >= 20 s). Data quality
+(`none/low/fair/good`) and confidence (`Insufficient data/Low/Moderate/High`) are reported
+separately from the pattern state. No state is worded as "person", "survivor" or "breathing detected".
+
+## Incident workflow
+
+Observations (RF pattern, elevated gas reading, operator inspection request, keypad alert request,
+operator notes) group into incidents within a 120 s window. Operators can also open an incident
+manually, add notes, acknowledge, and close (close requires prior acknowledgement).
+Commands to the Mega move created -> sent -> received -> executed -> acknowledged, or failed / timed_out.
+
+## Roadmap alignment (Concept & Architecture Guide)
+
+| Phase | State |
+| --- | --- |
+| 0-1 Single node on Pi | Backend runs on Pi-class hardware; ESP32 protocol v1 written, **awaiting first real build/flash** |
+| 2 Environmental I/O | Pi side done (protocol, simulator, API); **Mega firmware not written** |
+| 3 Incident workflow | Done: incidents, notes, acknowledgement, event history |
+| 4 Multi-node acquisition | Groundwork: node IDs, `nodes` table with deployment metadata, `/api/nodes`. Multi-stream ingestion and time alignment not done |
+| 5-6 Spatial research, 3D view | Not started. CSI does not provide reliable distance/angle/depth; this is a research goal |
+| 7 Field hardening | Not started |
+
+## Repository layout
 
 ```text
-rescue-sense/
-├── README.md
-├── firmware/                         # derived from official esp-csi csi_recv_router/csi_recv
-│   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
-│   └── main/
-│       ├── jatayu_csi.c
-│       ├── Kconfig.projbuild
-│       └── idf_component.yml
-├── backend/
-│   ├── app.py                         # Starlette server, serial/simulate ingest, DSP, WebSocket
-│   ├── processing.py                  # CSI DSP, scoring, calibration
-│   ├── serial_io.py                   # port discovery, wire parsing, reconnect, simulator
-│   ├── collect.py                     # labelled recording utility
-│   ├── train_presence_model.py        # optional RandomForest trainer
-│   ├── tests/                         # regression suite + accuracy sweep
-│   ├── requirements.txt
-│   └── README.md
-├── dashboard/
-│   └── index.html                     # no build step; canvas charts
-├── tools/
-│   ├── setup.ps1                      # prepare the Python environment
-│   ├── build-flash.ps1                # build + flash the firmware
-│   └── start-demo.ps1                 # run the backend + dashboard
-├── docs/
-│   ├── architecture.md
-│   ├── firmware-setup.md
-│   ├── calibration.md
-│   ├── demo-script.md
-│   └── failure-modes.md
-└── tools/
-    └── start-demo.ps1
+firmware/main/jatayu_csi.c      ESP32-S3 CSI node (derived from esp-csi csi_recv_router)
+backend/app.py                  Starlette server, CSI ingest, WebSocket
+backend/processing.py           CSI DSP, scoring, calibration
+backend/serial_io.py            port discovery, CSI1/legacy parsing, sequence tracking, simulator
+backend/jatayu/                 protocol, Arduino link, fusion, incidents, SQLite, REST/WS API
+backend/capture_raw.py          labelled raw-CSI recorder for experiments
+dashboard/index.html            operator console
+docs/                           architecture, esp32-node, hardware, firmware-setup, calibration, demo, failure modes
 ```
 
 ## Honest operating boundary
 
-This is a calibrated, single-link **breathing-motion demonstrator**, not a medically validated life detector or an exact through-wall rangefinder. Only label its output as “Breathing detected” and “estimated proximity”; obtain a separate, certified response system for an actual rescue deployment.
+A periodic RF pattern is an observation for operator review, not proof of a living person or breathing.
+MQ readings are experimental raw ADC counts, not certified gas concentrations, and are not evidence of a person.
+Do not use this system for rescue, triage or life-safety decisions.

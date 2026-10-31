@@ -1,5 +1,12 @@
 menu "JATAYU"
 
+config JATAYU_NODE_ID
+    string "Node identifier reported to the Pi"
+    default "jatayu_rx_01"
+    help
+        Included in the startup banner and every health line so the backend
+        can tell nodes apart once more than one receiver is deployed.
+
 config JATAYU_ROUTER_MODE
     bool "Use router / phone hotspot as CSI transmitter"
     default y
