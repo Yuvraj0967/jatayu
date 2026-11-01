@@ -186,21 +186,27 @@ class JatayuService:
                 self._emit("MICROPHONE_ON" if enabled else "MICROPHONE_OFF", actor)
             return {"enabled": self._audio_enabled}
 
-    def report_audio(self, kind: str, text: str, score: float, now: float | None = None) -> dict[str, Any]:
+    def report_audio(self, kind: str, text: str, score: float, now: float | None = None,
+                     level_db: float | None = None, proximity: str | None = None) -> dict[str, Any]:
         """A sound the listener flagged. Opens or joins an incident while monitoring is on."""
 
         if kind not in AUDIO_KINDS:
             raise ValueError("unknown audio kind")
         if not 0.0 <= score <= 1.0:
             raise ValueError("score must be between 0 and 1")
+        if proximity not in {None, "close", "medium", "far"}:
+            raise ValueError("unknown proximity")
+        if level_db is not None and not -120.0 <= level_db <= 0.0:
+            raise ValueError("level_db out of range")
         text = text.strip()[:100]
         with self.lock:
             now = time.time() if now is None else now
             self._audio_seen_at = now
             incident_id = self._add_observation("audio_alert", None, {"kind": kind, "text": text, "score": score}, now)
-            payload = {"kind": kind, "text": text, "score": score, "source": self.source}
+            payload = {"kind": kind, "text": text, "score": score, "level_db": level_db, "proximity": proximity, "source": self.source}
             event_id = self.store.add_event("AUDIO_ALERT", "microphone", payload, now, incident_id)
-            self._audio_last = {"id": event_id, "kind": kind, "text": text, "score": score, "at": now}
+            self._audio_last = {"id": event_id, "kind": kind, "text": text, "score": score, "level_db": level_db,
+                                "proximity": proximity, "at": now}
             self.publish({"type": "event", "event": {"id": event_id, "event_type": "AUDIO_ALERT", "actor": "microphone",
                                                      "payload": payload, "incident_id": incident_id, "created_at": now}})
             return self._audio_last

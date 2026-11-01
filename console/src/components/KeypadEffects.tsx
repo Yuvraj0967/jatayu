@@ -82,7 +82,7 @@ export function KeypadEffects({ status, apiBase, onShowOverview }: KeypadEffects
     audioSeen.current = audioId
     const last = status?.audio?.last
     if (first || !changed || !last) return
-    setPopup({ text: last.text, sub: `Microphone · score ${last.score.toFixed(2)} · for operator review`, alert: true })
+    setPopup({ text: last.text, sub: `${last.proximity ? `Sounds ${last.proximity} (rough, from loudness) · ` : ''}Microphone · for operator review`, alert: true })
     const timer = window.setTimeout(() => setPopup(null), 8000)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

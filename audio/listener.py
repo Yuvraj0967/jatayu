@@ -121,11 +121,13 @@ class Pipeline:
     def _report(self, alert) -> None:
         if alert is None:
             return
-        print(f"{time.strftime('%H:%M:%S')}  {alert.text}  (score {alert.score})")
-        self.reporter.send("/api/audio/event", {"kind": alert.kind, "text": alert.text, "score": alert.score})
+        print(f"{time.strftime('%H:%M:%S')}  {alert.text}  (score {alert.score}, {alert.level_db} dB, {alert.proximity})")
+        self.reporter.send("/api/audio/event", {"kind": alert.kind, "text": alert.text, "score": alert.score,
+                                                  "level_db": alert.level_db, "proximity": alert.proximity})
 
     def feed(self, samples: np.ndarray, now: float) -> None:
         self.level = rms(samples)
+        self._report(self.detector.on_block(samples, now))
         # Full vocabulary: limiting it to help phrases forces boosted noise into those words.
         pcm = (np.clip(condition(samples), -1.0, 1.0) * 32767).astype(np.int16).tobytes()
         if self.words.AcceptWaveform(pcm):

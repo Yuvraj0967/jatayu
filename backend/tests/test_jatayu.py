@@ -825,3 +825,50 @@ def test_detector_matches_whole_help_words_only():
     assert heard("please", "help").text.endswith('"please help"')
     assert heard("help").text.endswith('"help"')
 
+
+def _voice_blocks(seconds, pitch=500.0, amp=0.1, vibrato=6.0, seed=0):
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    t = np.arange(int(seconds * 16000)) / 16000
+    phase = 2 * np.pi * np.cumsum(pitch * (1 + vibrato / 100 * np.sin(2 * np.pi * 5 * t))) / 16000
+    wave = sum(np.sin(k * phase) / k for k in range(1, 6)) * amp + rng.normal(0, 0.0005, t.size)
+    return [wave[i:i + 1600] for i in range(0, wave.size - 1599, 1600)]
+
+
+def _feed_after_quiet(det, blocks):
+    import numpy as np
+    rng = np.random.default_rng(3)
+    for i in range(20):
+        det.on_block(rng.normal(0, 0.0005, 1600), i * 0.1)
+    return [a for k, b in enumerate(blocks) if (a := det.on_block(b, 2.0 + k * 0.1))]
+
+
+@pytest.mark.parametrize("pitch,amp", [(500.0, 0.1), (900.0, 0.1), (250.0, 0.1), (500.0, 0.004)])
+def test_sustained_aaaa_and_eeee_are_flagged_including_faint(pitch, amp):
+    alerts = _feed_after_quiet(_audio_detector(), _voice_blocks(1.5, pitch, amp))
+    assert alerts and alerts[0].kind == "scream"
+
+
+def test_short_vowel_steady_tone_and_noise_are_not_flagged():
+    import numpy as np
+    assert not _feed_after_quiet(_audio_detector(), _voice_blocks(0.3))
+    t = np.arange(32000) / 16000
+    tone = 0.1 * np.sin(2 * np.pi * 1000 * t)
+    assert not _feed_after_quiet(_audio_detector(), [tone[i:i + 1600] for i in range(0, 30400, 1600)])
+    noise = np.random.default_rng(1).normal(0, 0.05, 32000)
+    assert not _feed_after_quiet(_audio_detector(), [noise[i:i + 1600] for i in range(0, 30400, 1600)])
+
+
+def test_alert_carries_rough_proximity_from_loudness():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "audio"))
+    from detector import proximity_from_level
+
+    assert [proximity_from_level(x) for x in (-10, -30, -50)] == ["close", "medium", "far"]
+    loud = _feed_after_quiet(_audio_detector(), _voice_blocks(1.5, amp=0.2))[0]
+    faint = _feed_after_quiet(_audio_detector(), _voice_blocks(1.5, amp=0.004))[0]
+    assert loud.proximity == "close" and faint.proximity == "far"
+    svc = _service()
+    assert svc.report_audio("scream", "x", 0.5, level_db=-20.0, proximity="close")["proximity"] == "close"
+    with pytest.raises(ValueError):
+        svc.report_audio("scream", "x", 0.5, proximity="here")
+

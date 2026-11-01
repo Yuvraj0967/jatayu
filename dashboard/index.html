@@ -831,7 +831,7 @@
       audioSeen = id;
       const box = document.getElementById('livesPopup');
       box.querySelector('b').textContent = last.text;
-      box.querySelector('span').textContent = `Microphone · score ${Number(last.score).toFixed(2)} · for operator review`;
+      box.querySelector('span').textContent = `${last.proximity ? `Sounds ${last.proximity} (rough, from loudness) · ` : ''}Microphone · for operator review`;
       box.style.display = 'block';
       clearTimeout(showLives.t);
       showLives.t = setTimeout(() => { box.style.display = 'none'; }, 8000);

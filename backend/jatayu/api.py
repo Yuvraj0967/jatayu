@@ -163,7 +163,10 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
     async def audio_event(r: Request) -> JSONResponse:
         data = await body(r)
         try:
-            return JSONResponse(service.report_audio(str(data.get("kind")), str(data.get("text", "")), float(data.get("score", 0.0))), status_code=201)
+            return JSONResponse(service.report_audio(
+                str(data.get("kind")), str(data.get("text", "")), float(data.get("score", 0.0)),
+                level_db=float(data["level_db"]) if data.get("level_db") is not None else None,
+                proximity=data.get("proximity")), status_code=201)
         except (TypeError, ValueError) as exc:
             return err(str(exc))
 

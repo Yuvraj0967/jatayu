@@ -74,6 +74,8 @@ The estimates are too scattered to report as rates. No hand count was recorded.
 the words "help", "help me", "please help", "somebody help" and "save me", then shows a popup and stores an `AUDIO_ALERT`
 event. Audio is never saved or sent; only the result is. Sound classes come from YAMNet and words from Vosk.
 
+A held "aaaa" or "eeee" is caught by a separate check: a pitched voice lasting at least 1 second without a break. Each alert has a rough `close`, `medium` or `far` label from loudness alone, so a quiet voice nearby reads the same as a loud one far away.
+
 Faint sounds are favoured: quiet audio is boosted and a weak score counts when it repeats. **This raises false alarms, and
 range depends on the laptop microphone. A result means a sound was flagged, not that someone is in danger, and silence does
 not mean nobody is there.**
