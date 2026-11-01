@@ -68,6 +68,16 @@ One trial, own room with other people nearby. **No breathing rhythm was found in
 
 The estimates are too scattered to report as rates. No hand count was recorded.
 
+## Microphone
+
+`.\tools\start-audio.ps1` runs an offline listener on the laptop (`audio/`). It flags screams, shouts, distress sounds and
+the words "help", "help me", "please help", "somebody help" and "save me", then shows a popup and stores an `AUDIO_ALERT`
+event. Audio is never saved or sent; only the result is. Sound classes come from YAMNet and words from Vosk.
+
+Faint sounds are favoured: quiet audio is boosted and a weak score counts when it repeats. **This raises false alarms, and
+range depends on the laptop microphone. A result means a sound was flagged, not that someone is in danger, and silence does
+not mean nobody is there.**
+
 ## Keypad sections
 
 Keys open the matching section and highlight it for 3 seconds:

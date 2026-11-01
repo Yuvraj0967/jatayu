@@ -83,6 +83,13 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
       stale,
     },
     {
+      label: 'Microphone',
+      value: status?.audio?.online ? 'Listening' : 'Off',
+      sub: status?.audio?.last ? status.audio.last.text : 'Nothing flagged',
+      tone: status?.audio?.last ? 'var(--warning)' : status?.audio?.online ? 'var(--good)' : undefined,
+      stale,
+    },
+    {
       label: 'Keypad',
       value: status?.last_key?.key ?? '—',
       sub: status?.last_key ? status.last_key.action.replace(/_/g, ' ').toLowerCase() : 'No key pressed yet',

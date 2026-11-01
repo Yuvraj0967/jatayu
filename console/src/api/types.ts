@@ -81,6 +81,7 @@ export interface Status {
   rf: RfState
   environment: EnvironmentState
   last_key: LastKey | null
+  audio?: { online: boolean; level: number; last: { id: number; kind: string; text: string; score: number; at: number } | null }
   lives?: { total: number; last: { id: number; count: number; text: string; at: number } | null }
   lcd_page: string
   incident_counts: { open: number; acknowledged: number; closed: number }

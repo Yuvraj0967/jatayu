@@ -160,6 +160,21 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
         service._emit("GAS_REBASELINE_REQUESTED", "operator")
         return JSONResponse({"ok": True})
 
+    async def audio_event(r: Request) -> JSONResponse:
+        data = await body(r)
+        try:
+            return JSONResponse(service.report_audio(str(data.get("kind")), str(data.get("text", "")), float(data.get("score", 0.0))), status_code=201)
+        except (TypeError, ValueError) as exc:
+            return err(str(exc))
+
+    async def audio_heartbeat(r: Request) -> JSONResponse:
+        data = await body(r)
+        try:
+            service.audio_heartbeat(max(0.0, min(1.0, float(data.get("level", 0.0)))))
+        except (TypeError, ValueError) as exc:
+            return err(str(exc))
+        return JSONResponse({"ok": True})
+
     async def sim_key(r: Request) -> JSONResponse:
         sim = service.arduino
         if not hasattr(sim, "press"):
@@ -219,6 +234,8 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
         Route("/api/monitoring/start", start, methods=["POST"]),
         Route("/api/monitoring/stop", stop, methods=["POST"]),
         Route("/api/inspection/request", inspection, methods=["POST"]),
+        Route("/api/audio/event", audio_event, methods=["POST"]),
+        Route("/api/audio/heartbeat", audio_heartbeat, methods=["POST"]),
         Route("/api/simulate/key", sim_key, methods=["POST"]),
         Route("/api/simulate/gas", sim_gas, methods=["POST"]),
         WebSocketRoute("/ws/live", live),

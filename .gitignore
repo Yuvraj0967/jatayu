@@ -23,3 +23,6 @@ console/shots/
 console/*.png
 .env
 *.env
+audio/.venv/
+audio/models/
+JATAYU_UNO_firmware.zip

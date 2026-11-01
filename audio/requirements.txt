@@ -1,0 +1,6 @@
+numpy
+scipy
+requests
+sounddevice
+vosk==0.3.45
+ai-edge-litert

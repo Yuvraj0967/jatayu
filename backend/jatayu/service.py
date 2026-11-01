@@ -16,6 +16,8 @@ from .fusion import OBSERVATION_LABELS, GasAssessor, GasConfig, RfAssessor, RfCo
 from .store import Store
 
 LIVES_REPORTED, LIVES_UNDONE = "LIVES_SAVED_REPORTED", "LIVES_SAVED_UNDONE"
+AUDIO_KINDS = frozenset({"scream", "distress", "help"})
+AUDIO_STALE_S = 10.0  # the listener sends a heartbeat every few seconds
 CODE_WINDOW_S = 3.0  # time allowed between the 0 and the digit of a keypad code
 
 LCD_PAGES = ("overview", "sensor", "rf", "system", "incidents", "diagnostics")
@@ -40,6 +42,9 @@ class JatayuService:
         self.lcd_page = "overview"
         self.last_key: dict[str, Any] | None = None
         self.has_lcd = True  # the UNO says otherwise in its hello
+        self._audio_seen_at: float | None = None
+        self._audio_level = 0.0
+        self._audio_last: dict[str, Any] | None = None
         self._code_until = 0.0
         self._lives: list[int] = []
         for event in store.events_of_types((LIVES_REPORTED, LIVES_UNDONE)):
@@ -158,6 +163,31 @@ class JatayuService:
         self._lives_last = {"id": event_id, "count": count, "text": text, "at": now}
         self.publish({"type": "event", "event": {"id": event_id, "event_type": event, "actor": "operator",
                                                  "payload": payload, "incident_id": None, "created_at": now}})
+
+    # -- microphone listener --------------------------------------------------------
+    def audio_heartbeat(self, level: float, now: float | None = None) -> None:
+        with self.lock:
+            self._audio_seen_at = time.time() if now is None else now
+            self._audio_level = level
+
+    def report_audio(self, kind: str, text: str, score: float, now: float | None = None) -> dict[str, Any]:
+        """A sound the listener flagged. Opens or joins an incident while monitoring is on."""
+
+        if kind not in AUDIO_KINDS:
+            raise ValueError("unknown audio kind")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError("score must be between 0 and 1")
+        text = text.strip()[:100]
+        with self.lock:
+            now = time.time() if now is None else now
+            self._audio_seen_at = now
+            incident_id = self._add_observation("audio_alert", None, {"kind": kind, "text": text, "score": score}, now)
+            payload = {"kind": kind, "text": text, "score": score, "source": self.source}
+            event_id = self.store.add_event("AUDIO_ALERT", "microphone", payload, now, incident_id)
+            self._audio_last = {"id": event_id, "kind": kind, "text": text, "score": score, "at": now}
+            self.publish({"type": "event", "event": {"id": event_id, "event_type": "AUDIO_ALERT", "actor": "microphone",
+                                                     "payload": payload, "incident_id": incident_id, "created_at": now}})
+            return self._audio_last
 
     # -- operator actions --------------------------------------------------------
     def start_monitoring(self, actor: str = "dashboard") -> dict[str, Any]:
@@ -357,6 +387,8 @@ class JatayuService:
                 "environment": self.gas_state,
                 "last_key": self.last_key,
                 "lives": {"total": sum(self._lives), "last": self._lives_last},
+                "audio": {"online": bool(self._audio_seen_at and time.time() - self._audio_seen_at <= AUDIO_STALE_S),
+                          "level": self._audio_level, "last": self._audio_last},
                 "lcd_page": self.lcd_page,
                 "incident_counts": self.store.count_incidents(),
                 "performance": {"tick_ms": self.tick_ms},

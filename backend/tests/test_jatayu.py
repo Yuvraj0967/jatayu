@@ -717,3 +717,74 @@ def test_compare_recordings_verdict():
     assert "do not overlap" in verdict([3.0, 4.0], [0.5, 0.7])
     assert "overlap" in verdict([1.0, 3.0], [2.0, 4.0]) and "do not" in verdict([1.0, 3.0], [2.0, 4.0])
 
+
+def test_audio_alert_is_stored_and_opens_incident_only_when_monitoring():
+    svc = _service()
+    assert svc.snapshot()["audio"]["online"] is False
+    svc.report_audio("help", 'Possible call for help heard: "help me"', 0.8)
+    assert svc.snapshot()["audio"]["last"]["kind"] == "help"
+    assert svc.store.incidents(limit=5) == []
+    svc.start_monitoring()
+    svc.report_audio("scream", "Possible scream heard", 0.4)
+    assert len(svc.store.incidents(limit=5)) == 1
+    assert sum(e["event_type"] == "AUDIO_ALERT" for e in svc.store.events(limit=50)) == 2
+
+
+@pytest.mark.parametrize("kind,score", [("music", 0.5), ("help", 1.5), ("help", -0.1)])
+def test_audio_alert_limits(kind, score):
+    with pytest.raises(ValueError):
+        _service().report_audio(kind, "x", score)
+
+
+def test_audio_heartbeat_goes_stale():
+    svc = _service()
+    svc.audio_heartbeat(0.01)
+    assert svc.snapshot()["audio"]["online"] is True
+    svc.audio_heartbeat(0.01, now=time.time() - 60)
+    assert svc.snapshot()["audio"]["online"] is False
+
+
+def _audio_detector():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "audio"))
+    from detector import AudioDetector
+    return AudioDetector()
+
+
+def test_detector_weak_scream_needs_repeat_and_strong_is_immediate():
+    det = _audio_detector()
+    assert det.on_sound_scores({"Screaming": 0.12}, 0.0) is None
+    assert det.on_sound_scores({"Screaming": 0.12}, 0.5).kind == "scream"
+    assert _audio_detector().on_sound_scores({"Yell": 0.5}, 0.0).kind == "scream"
+    assert _audio_detector().on_sound_scores({"Speech": 0.9, "Music": 0.9}, 0.0) is None
+
+
+def test_detector_cooldown_and_help_words():
+    det = _audio_detector()
+    assert det.on_sound_scores({"Screaming": 0.9}, 0.0) is not None
+    assert det.on_sound_scores({"Screaming": 0.9}, 1.0) is None
+    assert det.on_sound_scores({"Screaming": 0.9}, 6.0) is not None
+    words = [{"word": "help", "conf": 0.9}, {"word": "me", "conf": 0.8}]
+    assert _audio_detector().on_words(words, 10.0) is None  # no voice heard: treated as noise
+    det.on_sound_scores({"Speech": 0.6}, 9.5)
+    assert '"help me"' in det.on_words(words, 10.0).text
+    weak = _audio_detector()
+    weak.on_sound_scores({"Speech": 0.6}, 0.0)
+    assert weak.on_words([{"word": "help", "conf": 0.3}], 0.5) is None
+    assert weak.on_words([{"word": "[unk]", "conf": 1.0}], 0.5) is None
+
+
+def test_detector_boosts_faint_audio_and_ignores_silence():
+    import numpy as np
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "audio"))
+    from detector import condition
+
+    t = np.arange(16000) / 16000
+    faint = condition(0.02 * np.sin(2 * np.pi * 800 * t))
+    assert np.max(np.abs(faint)) > 0.3
+    det = _audio_detector()
+    room = 0.002 * np.random.default_rng(1).normal(size=16000)
+    for _ in range(10):
+        det.above_noise(room)
+    assert det.above_noise(room * 4) is True
+    assert det.above_noise(np.zeros(16000)) is False
+

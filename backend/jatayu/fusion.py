@@ -196,4 +196,5 @@ OBSERVATION_LABELS = {
     "alert_request": "Operator alert request (keypad *)",
     "operator_note": "Operator note",
     "manual": "Incident opened by operator",
+    "audio_alert": "Possible call for help or scream heard",
 }
