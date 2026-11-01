@@ -179,7 +179,8 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
             else:
                 heard = None
             return JSONResponse(service.audio_heartbeat(max(0.0, min(1.0, float(data.get("level", 0.0)))),
-                                                        listening=data.get("listening") is True, heard=heard))
+                                                        listening=data.get("listening") is True, heard=heard,
+                                                        error=str(data["error"])[:160] if data.get("error") else None))
         except (TypeError, ValueError) as exc:
             return err(str(exc))
 

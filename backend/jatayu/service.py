@@ -47,6 +47,7 @@ class JatayuService:
         self._audio_enabled = False  # the microphone stays closed until an operator turns it on
         self._audio_listening = False
         self._audio_heard: dict[str, Any] | None = None
+        self._audio_error: str | None = None
         self._audio_last: dict[str, Any] | None = None
         self._code_until = 0.0
         self._lives: list[int] = []
@@ -169,7 +170,7 @@ class JatayuService:
 
     # -- microphone listener --------------------------------------------------------
     def audio_heartbeat(self, level: float, now: float | None = None, listening: bool = False,
-                        heard: dict[str, Any] | None = None) -> dict[str, Any]:
+                        heard: dict[str, Any] | None = None, error: str | None = None) -> dict[str, Any]:
         """Listener check-in. The reply tells it whether the microphone should be open."""
 
         with self.lock:
@@ -177,6 +178,7 @@ class JatayuService:
             self._audio_level = level
             self._audio_listening = listening
             self._audio_heard = heard
+            self._audio_error = error
             return {"enabled": self._audio_enabled}
 
     def set_audio_enabled(self, enabled: bool, actor: str = "operator") -> dict[str, Any]:
@@ -411,6 +413,7 @@ class JatayuService:
                 "lives": {"total": sum(self._lives), "last": self._lives_last},
                 "audio": {"online": bool(self._audio_seen_at and time.time() - self._audio_seen_at <= AUDIO_STALE_S),
                           "enabled": self._audio_enabled, "listening": self._audio_listening,
+                          "error": self._audio_error,
                           "level": self._audio_level, "heard": self._audio_heard, "last": self._audio_last},
                 "lcd_page": self.lcd_page,
                 "incident_counts": self.store.count_incidents(),

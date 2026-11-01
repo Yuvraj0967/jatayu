@@ -885,3 +885,12 @@ def test_results_page_is_served_at_simple():
         assert client.get("/simple/app.js").status_code == 200
         assert client.get("/simple/../../backend/app.py").status_code == 404
 
+
+def test_microphone_error_is_reported_then_clears():
+    svc = _service()
+    svc.set_audio_enabled(True)
+    svc.audio_heartbeat(0.0, error="Could not open the microphone: busy")
+    assert "busy" in svc.snapshot()["audio"]["error"]
+    svc.audio_heartbeat(0.01, listening=True)
+    assert svc.snapshot()["audio"]["error"] is None
+

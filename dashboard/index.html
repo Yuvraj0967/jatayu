@@ -821,7 +821,7 @@
       $('micBtn').textContent = micEnabled ? 'Turn off' : 'Turn on';
       $('micBtn').setAttribute('aria-pressed', String(micEnabled));
       $('micPanelDot').className = `dot ${listening ? 'ok' : !audio.online ? 'warn' : ''}`;
-      $('micState').textContent = !audio.online ? 'Listener not running on the laptop' : listening ? 'Listening' : micEnabled ? 'Starting…' : 'Off';
+      $('micState').textContent = !audio.online ? 'Listener not running. On the laptop, open tools\\Start Microphone.bat' : audio.error ? audio.error : listening ? 'Listening' : micEnabled ? 'Starting…' : 'Off';
       // Square root so quiet sounds still move the meter.
       $('micMeter').style.width = listening ? `${Math.min(100, Math.sqrt(audio.level || 0) * 330)}%` : '0';
       $('micHeard').textContent = listening && audio.heard ? `Hearing: ${audio.heard.label} ${Math.round(audio.heard.score * 100)}%` : (audio.last ? audio.last.text : '\u00a0');

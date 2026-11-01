@@ -175,13 +175,24 @@ def run_microphone(device: int | None, pipeline: Pipeline, reporter: Reporter) -
 
     print("Ready, with the microphone closed. Audio is never saved. Press Ctrl+C to quit.")
     stream = None
+    retry_at = 0.0
     try:
         while True:
-            if reporter.enabled and stream is None:
-                stream = sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1, dtype="float32",
-                                        blocksize=BLOCK, callback=on_audio)
-                stream.start()
-                print(f"{time.strftime('%H:%M:%S')}  Microphone ON")
+            if reporter.enabled and stream is None and time.monotonic() >= retry_at:
+                try:
+                    stream = sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+                                            blocksize=BLOCK, callback=on_audio)
+                    stream.start()
+                    reporter.status = {"level": 0.0, "listening": True, "heard": None}
+                    print(f"{time.strftime('%H:%M:%S')}  Microphone ON")
+                except Exception as exc:  # busy, unplugged or blocked by Windows: say so and keep trying
+                    if stream is not None:
+                        stream.close()
+                    stream = None
+                    retry_at = time.monotonic() + 5.0
+                    message = f"Could not open the microphone: {exc}"[:120]
+                    reporter.status = {"level": 0.0, "listening": False, "heard": None, "error": message}
+                    print(f"{time.strftime('%H:%M:%S')}  {message}")
             elif not reporter.enabled and stream is not None:
                 stream.close()
                 stream = None
@@ -190,6 +201,8 @@ def run_microphone(device: int | None, pipeline: Pipeline, reporter: Reporter) -
                     blocks.get_nowait()
                 reporter.status = {"level": 0.0, "listening": False, "heard": None}
                 print(f"{time.strftime('%H:%M:%S')}  Microphone OFF")
+            elif not reporter.enabled and reporter.status.get("error"):
+                reporter.status = {"level": 0.0, "listening": False, "heard": None}
             if stream is None:
                 time.sleep(0.2)
                 continue

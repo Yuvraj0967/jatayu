@@ -52,4 +52,10 @@ if (-not (Test-Path $speech)) {
 $arguments = @((Join-Path $audio 'listener.py'), '--backend', $Backend)
 if ($ListDevices) { $arguments += '--list-devices' }
 if ($Device -ge 0) { $arguments += @('--device', "$Device") }
-& $python @arguments
+if ($ListDevices) { & $python @arguments; return }
+# Restart after a crash, so the website's button keeps working. Ctrl+C stops it.
+while ($true) {
+    & $python @arguments
+    Write-Host 'Listener stopped. Restarting in 5 seconds. Press Ctrl+C to quit.'
+    Start-Sleep -Seconds 5
+}
