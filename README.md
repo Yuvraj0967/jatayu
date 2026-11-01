@@ -15,7 +15,7 @@ Built on the RescueSense CSI pipeline; the DSP and acquisition firmware were ext
 | --- | --- |
 | `firmware/` | ESP32-S3 CSI node (protocol v1: sequence numbers, health counters, RAW stream) |
 | `backend/` | CSI DSP + JATAYU layer (Arduino link, SQLite, fusion, incidents, REST/WebSocket) |
-| `dashboard/` | Operator console (single page, no build step) |
+| `dashboard/` | Operator console (single page, no build step) + [`simple/`](dashboard/simple/README.md) results page (read-only, GET only) |
 | `tools/` | PowerShell setup/build/flash/run scripts (Windows) |
 | `docs/` | [system guide](docs/system-guide.md) (current setup, real vs simulated, results), [architecture](docs/architecture.md), [ESP32 node](docs/esp32-node.md), [hardware](docs/hardware.md), [firmware setup](docs/firmware-setup.md), [calibration](docs/calibration.md), [demo](docs/demo-script.md), [failure modes](docs/failure-modes.md), [Lovable prompt](docs/lovable-prompt.md) |
 
@@ -28,7 +28,7 @@ python app.py --simulate        # everything is badged "simulated"
 python -m pytest tests          # needs: pip install pytest httpx
 ```
 
-Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment, incidents, timeline, commands, nodes). The console explains itself: a "What to do next" box, a setup checklist, a guided tour, a help glossary, Simple/Detailed view and a text-size control. The original live signal view (waveform, spectrum, 3D view, calibration) is kept as the **Signal lab** tab and is also available on its own at `/csi`. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
+Open `http://127.0.0.1:8000` for the JATAYU console (RF observation, environment, incidents, timeline, commands, nodes). The console explains itself: a "What to do next" box, a setup checklist, a guided tour, a help glossary, Simple/Detailed view and a text-size control. The original live signal view (waveform, spectrum, 3D view, calibration) is kept as the **Signal lab** tab and is also available on its own at `/csi`. For a quieter read-only view of the same backend numbers, open [`dashboard/simple/`](dashboard/simple/README.md) — it reads four endpoints with GET and issues no writes, and needs no backend change. Windows helper: `.\tools\start-demo.ps1 -Simulate`.
 
 ## Live hardware
 

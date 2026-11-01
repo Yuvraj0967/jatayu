@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#16261f">
+<title>JATAYU — Observation Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2316261f'/%3E%3Cpath d='m5 10 11 6 11-6-7 12h-8z' fill='none' stroke='%23c2d3ae' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to observations</a>
+
+<header class="masthead">
+  <div class="mast-inner">
+    <a class="brand" href="#main" aria-label="JATAYU observation console">
+      <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M4 11 20 19 36 11 26 29H14L4 11Z" stroke="currentColor" stroke-width="1.6"/><path d="m12 16 8 13 8-13M20 19v10" stroke="currentColor" stroke-width="1.2"/></svg>
+      <span>JATAYU<small>Observation console</small></span>
+    </a>
+    <div class="mast-right"><span class="local-label">Local first · human review</span><span class="read-only">Read only</span></div>
+  </div>
+</header>
+
+<nav class="navigation" aria-label="Console sections">
+  <div class="nav-inner">
+    <div class="nav-links"><a class="selected" href="#main">Overview</a><a href="#signal">Signal</a><a href="#devices">Devices</a><a href="#activity">Activity</a></div>
+    <button class="text-button" data-open-connection><span class="connection-dot" id="nav-dot"></span><span id="connection-label" aria-live="polite">Connecting</span><span aria-hidden="true">⚙</span></button>
+  </div>
+</nav>
+
+<main id="main" class="workspace">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Field observations</p>
+      <h1>Observation overview</h1>
+      <p class="subtitle">The signal, the environment, and what you need to review.</p>
+    </div>
+    <div class="heading-actions">
+      <span class="updated" id="updated">Waiting for backend</span>
+      <button class="button secondary" id="pause-button" aria-pressed="false"><span id="pause-icon" aria-hidden="true">❚❚</span><span id="pause-label">Pause updates</span></button>
+      <button class="button primary" data-open-connection>Connection</button>
+    </div>
+  </div>
+
+  <div class="source-strip" id="source-strip">
+    <span class="badge" id="source-badge">Source unknown</span>
+    <p id="source-description">Waiting for your JATAYU backend. No sample values are shown.</p>
+    <span class="poll-label">GET only · 1 s refresh</span>
+  </div>
+
+  <div class="connection-warning" id="connection-warning" role="status" hidden></div>
+  <noscript><div class="connection-warning">Enable JavaScript so this page can read your backend. Without it, no sensor values are available.</div></noscript>
+
+  <div class="dashboard-grid" id="dashboard-grid">
+
+    <section class="panel rf-panel" aria-labelledby="rf-title">
+      <div class="panel-heading"><h2 id="rf-title"><span class="section-number">01</span>RF observation</h2><span class="micro">Wi-Fi CSI</span></div>
+      <div class="rf-body">
+        <div class="observation-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 36 36" fill="none"><path d="M3 19h6l3-9 6 18 5-15 3 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <span class="mini-label" id="rf-quality-caption">Waiting for input</span>
+          <h3 id="rf-state">No observation yet</h3>
+          <p id="rf-explanation">Connect to your backend to receive the current RF assessment.</p>
+        </div>
+      </div>
+      <div class="rf-footer"><span><i class="tiny-dot"></i>An observation, not confirmation of a person.</span><span class="mono" id="sustained">— s sustained</span></div>
+    </section>
+
+    <section class="panel environment-panel" aria-labelledby="environment-title">
+      <div class="panel-heading"><h2 id="environment-title"><span class="section-number">02</span>Environment</h2><span class="badge muted" id="environment-state">No data</span></div>
+      <div class="environment-reading"><strong id="gas-value">—</strong><span>raw ADC<br><small id="gas-model">MQ sensor</small></span></div>
+      <div class="gas-reference"><span>Baseline <b id="gas-baseline">—</b></span><span>Threshold <b id="gas-threshold">—</b></span></div>
+      <p class="environment-note" id="gas-note">Raw readings only. Not a certified gas concentration.</p>
+    </section>
+
+    <section class="panel signal-panel" id="signal" aria-labelledby="signal-title">
+      <div class="panel-heading">
+        <div><h2 id="signal-title"><span class="section-number">03</span>Signal trace</h2><p class="panel-subtitle">The waveform your backend actually returned</p></div>
+        <label class="select-wrap"><span class="sr-only">Trace type</span><select id="trace-select"><option value="processed">Processed CSI</option><option value="raw">Raw CSI</option></select></label>
+      </div>
+      <div class="chart-caption"><span><i class="line-swatch"></i><span id="trace-label">Processed CSI amplitude</span></span><span class="mono" id="trace-state">No data</span></div>
+      <div class="chart-wrap">
+        <svg id="waveform" viewBox="0 0 720 182" role="img" aria-labelledby="chart-title chart-description" preserveAspectRatio="none">
+          <title id="chart-title">Backend signal waveform</title>
+          <desc id="chart-description">Waiting for waveform samples.</desc>
+          <defs><linearGradient id="wave-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d7a58" stop-opacity=".16"/><stop offset="100%" stop-color="#3d7a58" stop-opacity=".01"/></linearGradient></defs>
+          <g class="chart-grid"><path d="M42 15H709M42 52H709M42 89H709M42 126H709M42 163H709M42 15V163M175 15V163M308 15V163M441 15V163M574 15V163M709 15V163"/></g>
+          <path id="wave-area" fill="url(#wave-fill)"/>
+          <polyline id="wave-line" fill="none" stroke="#377b5b" stroke-width="1.9" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+          <g class="axis-label"><text id="y-high" x="33" y="20" text-anchor="end">—</text><text id="y-mid" x="33" y="94" text-anchor="end">—</text><text id="y-low" x="33" y="166" text-anchor="end">—</text></g>
+        </svg>
+        <div id="chart-empty" class="chart-empty">Waiting for the backend waveform</div>
+      </div>
+      <div class="x-axis"><span id="x-start">— s</span><span>Seconds relative to the latest sample</span><span id="x-end">— s</span></div>
+      <div class="signal-metrics">
+        <div><span class="metric-label">Signal quality</span><strong id="quality">—</strong></div>
+        <div><span class="metric-label">Confidence <button class="help" title="The backend's confidence label for the RF pattern. It is not a probability that a person is present." aria-label="Confidence describes the RF pattern, not a person's presence">?</button></span><strong id="confidence">—</strong></div>
+        <div><span class="metric-label">Packet rate</span><strong><span id="packet-rate">—</span><small>Hz</small></strong></div>
+        <div><span class="metric-label">Packet loss</span><strong><span id="packet-loss">—</span><small>%</small></strong></div>
+      </div>
+      <details class="signal-details"><summary>Signal diagnostics<span aria-hidden="true">+</span></summary>
+        <dl>
+          <div><dt>Dominant pattern rate</dt><dd id="pattern-rate">— cycles/min</dd></div>
+          <div><dt>Received signal strength</dt><dd id="rssi">— dBm</dd></div>
+          <div><dt>Periodicity score</dt><dd id="periodicity">—</dd></div>
+          <div><dt>Last CSI frame age</dt><dd id="frame-age">—</dd></div>
+        </dl>
+        <p>Pattern rate is not a medical breathing measurement. Fields the backend has not produced stay blank.</p>
+      </details>
+    </section>
+
+    <section class="panel devices-panel" id="devices" aria-labelledby="devices-title">
+      <div class="panel-heading"><h2 id="devices-title"><span class="section-number">04</span>Connected devices</h2><span class="micro">Input path</span></div>
+      <div class="device-list">
+        <div class="device"><div class="device-icon" aria-hidden="true">01</div><div class="device-copy"><h3>ESP32-S3</h3><p>Wi-Fi CSI receiver</p></div><span class="device-state" id="esp-state">Unknown</span></div>
+        <div class="device"><div class="device-icon" aria-hidden="true">02</div><div class="device-copy"><h3>Raspberry Pi / host</h3><p>Processing and local storage</p></div><span class="device-state" id="host-state">Unknown</span></div>
+        <div class="device"><div class="device-icon" aria-hidden="true">03</div><div class="device-copy"><h3>Arduino UNO</h3><p>MQ sensor and keypad</p></div><span class="device-state" id="arduino-state">Unknown</span></div>
+      </div>
+      <div class="backend-summary">
+        <div><span>Backend</span><button class="endpoint-link" id="endpoint-label" data-open-connection>Not set</button></div>
+        <div><span>Service tick</span><span class="mono" id="tick-time">— ms</span></div>
+        <div><span>Incident monitoring</span><span id="monitoring-state">Unknown</span></div>
+      </div>
+      <p class="device-note" id="device-note">This page reads the existing API. It does not change device settings or start monitoring.</p>
+    </section>
+
+    <section class="panel activity-panel" id="activity" aria-labelledby="activity-title">
+      <div class="panel-heading">
+        <div><h2 id="activity-title"><span class="section-number">05</span>Recent activity</h2><p class="panel-subtitle">Events recorded by JATAYU</p></div>
+        <label class="select-wrap"><span class="sr-only">Filter events</span><select id="event-filter"><option value="all">All events</option><option value="rf">RF observations</option><option value="device">Devices</option><option value="incident">Incidents</option></select></label>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th scope="col">Time</th><th scope="col">Event</th><th scope="col">Source</th></tr></thead><tbody id="events-body"><tr><td colspan="3" class="empty-cell">Waiting for recorded events.</td></tr></tbody></table></div>
+      <p id="events-note" class="table-note">Read-only history · refreshed every 5 seconds</p>
+    </section>
+
+    <section class="panel review-panel" aria-labelledby="review-title">
+      <div class="panel-heading"><h2 id="review-title"><span class="section-number">06</span>Review queue</h2><span class="micro">Incidents</span></div>
+      <div class="queue-metrics"><div><strong id="open-count">—</strong><span>Open</span></div><div><strong id="ack-count">—</strong><span>Acknowledged</span></div><div><strong id="closed-count">—</strong><span>Closed</span></div></div>
+      <div id="incident-list" class="incident-list"><p>Waiting for incident records.</p></div>
+      <p class="review-note">Review only. Acknowledge, close and device commands stay in your existing console.</p>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span><span class="footer-mark">J</span>Experimental decision support. Not for rescue, triage or life-safety decisions.</span>
+    <span class="footer-right">Local data · no cloud required</span>
+  </footer>
+</main>
+
+<dialog id="connection-dialog" aria-labelledby="connection-title">
+  <form id="connection-form">
+    <div class="dialog-heading"><span class="eyebrow">Backend connection</span><button type="button" class="close-button" data-close-dialog aria-label="Close connection settings">×</button></div>
+    <h2 id="connection-title">Your backend, this interface</h2>
+    <p>Enter the address of the JATAYU server you already run. This page only reads its existing endpoints — no backend changes are needed.</p>
+    <label for="backend-address">Backend URL</label>
+    <input id="backend-address" type="url" placeholder="http://192.168.1.22:8000" required autocomplete="url" spellcheck="false">
+    <p class="field-hint">Use the Pi's address on the same network, or localhost when the backend runs on this machine.</p>
+    <div class="api-contract"><span>Read-only endpoints</span><code>GET /api/status</code><code>GET /telemetry</code><code>GET /api/events</code><code>GET /api/incidents</code></div>
+    <p class="form-error" id="connection-error" role="alert" hidden></p>
+    <div class="dialog-actions"><button type="button" class="button secondary" data-close-dialog>Cancel</button><button type="submit" class="button primary">Connect backend</button></div>
+    <p class="dialog-footnote">Pause stops this page's updates only. It never pauses your backend.</p>
+  </form>
+</dialog>
+
+<dialog id="incident-dialog" aria-labelledby="incident-detail-title">
+  <div class="dialog-heading"><span class="eyebrow">Recorded incident</span><button type="button" class="close-button" id="close-incident" aria-label="Close incident">×</button></div>
+  <h2 id="incident-detail-title">Incident</h2>
+  <p id="incident-detail-summary"></p>
+  <div id="incident-detail-content"></div>
+  <p class="dialog-footnote">This view cannot modify or acknowledge an incident.</p>
+</dialog>
+
+<script src="model.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
