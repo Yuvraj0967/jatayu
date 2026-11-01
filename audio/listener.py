@@ -31,7 +31,8 @@ MODELS = HERE / "models"
 WINDOW = 15600  # YAMNet's fixed input, 0.975 s
 HOP = 8000  # classify twice a second, so a short cry is not split across windows
 BLOCK = 1600
-HEARTBEAT_S = 3.0
+HEARTBEAT_S = 1.0
+HEARD_MIN_SCORE = 0.1
 
 
 class SoundClassifier:
@@ -51,13 +52,17 @@ class SoundClassifier:
 
 
 class Reporter:
-    """Sends results on its own thread, so a slow network never stalls listening."""
+    """Sends results and check-ins on their own threads, so a slow network never stalls listening."""
 
     def __init__(self, backend: str | None) -> None:
         self.backend = backend.rstrip("/") if backend else None
         self.outbox: queue.Queue[tuple[str, dict]] = queue.Queue(maxsize=50)
+        self.enabled = self.backend is None  # with a backend, the website's button decides
+        self.status: dict = {"level": 0.0, "listening": False, "heard": None}
+        self.reachable: bool | None = None
         if self.backend:
-            threading.Thread(target=self._run, daemon=True).start()
+            threading.Thread(target=self._send_events, daemon=True).start()
+            threading.Thread(target=self._check_in, daemon=True).start()
 
     def send(self, path: str, payload: dict) -> None:
         if self.backend:
@@ -66,19 +71,32 @@ class Reporter:
             except queue.Full:
                 pass
 
-    def _run(self) -> None:
-        reachable = None
+    def _note(self, ok: bool) -> None:
+        if ok and self.reachable is not True:
+            print(f"Connected to {self.backend}. Use the microphone button on the website.")
+        elif not ok and self.reachable is not False:
+            print(f"Cannot reach {self.backend}. Microphone stays off until it can.")
+        self.reachable = ok
+
+    def _send_events(self) -> None:
         while True:
             path, payload = self.outbox.get()
             try:
                 requests.post(f"{self.backend}{path}", json=payload, timeout=3).raise_for_status()
-                if reachable is not True:
-                    print(f"Connected to {self.backend}")
-                reachable = True
-            except requests.RequestException as exc:
-                if reachable is not False:
-                    print(f"Backend not reachable, still listening: {exc.__class__.__name__}")
-                reachable = False
+            except requests.RequestException:
+                pass
+
+    def _check_in(self) -> None:
+        while True:
+            try:
+                reply = requests.post(f"{self.backend}/api/audio/heartbeat", json=self.status, timeout=3)
+                reply.raise_for_status()
+                self.enabled = reply.json().get("enabled") is True
+                self._note(True)
+            except (requests.RequestException, ValueError):
+                self.enabled = False  # no connection means no way to turn it off, so close it
+                self._note(False)
+            time.sleep(HEARTBEAT_S)
 
 
 class Pipeline:
@@ -91,6 +109,14 @@ class Pipeline:
         self.words.SetWords(True)
         self.buffer = np.zeros(0, dtype=np.float32)
         self.level = 0.0
+        self.heard: dict | None = None  # strongest sound in the latest window that stood out
+        self.heard_at = 0.0
+
+    def reset(self) -> None:
+        self.buffer = np.zeros(0, dtype=np.float32)
+        self.level = 0.0
+        self.heard = None
+        self.words.Reset()
 
     def _report(self, alert) -> None:
         if alert is None:
@@ -108,7 +134,13 @@ class Pipeline:
         while self.buffer.size >= WINDOW:
             window, self.buffer = self.buffer[:WINDOW], self.buffer[HOP:]
             if self.detector.above_noise(window):
-                self._report(self.detector.on_sound_scores(self.classifier.scores(condition(window)), now))
+                scores = self.classifier.scores(condition(window))
+                label = max(scores, key=scores.get)
+                if scores[label] >= HEARD_MIN_SCORE:
+                    self.heard, self.heard_at = {"label": label, "score": round(scores[label], 2)}, now
+                self._report(self.detector.on_sound_scores(scores, now))
+        if now - self.heard_at > 3.0:
+            self.heard = None
 
     def finish(self, now: float) -> None:
         self._report(self.detector.on_words(json.loads(self.words.FinalResult()).get("result", []), now))
@@ -127,6 +159,8 @@ def run_file(path: str, pipeline: Pipeline) -> None:
 
 
 def run_microphone(device: int | None, pipeline: Pipeline, reporter: Reporter) -> None:
+    """The microphone is only open while the website's button says so."""
+
     import sounddevice as sd  # only needed for live listening
 
     blocks: queue.Queue[np.ndarray] = queue.Queue(maxsize=100)
@@ -137,15 +171,34 @@ def run_microphone(device: int | None, pipeline: Pipeline, reporter: Reporter) -
         except queue.Full:
             pass  # analysis fell behind: drop rather than build up delay
 
-    print("Listening. Audio is not saved. Press Ctrl+C to stop.")
-    last_beat = 0.0
-    with sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=BLOCK, callback=on_audio):
+    print("Ready, with the microphone closed. Audio is never saved. Press Ctrl+C to quit.")
+    stream = None
+    try:
         while True:
-            pipeline.feed(blocks.get(), time.monotonic())
-            now = time.monotonic()
-            if now - last_beat >= HEARTBEAT_S:
-                last_beat = now
-                reporter.send("/api/audio/heartbeat", {"level": round(pipeline.level, 5)})
+            if reporter.enabled and stream is None:
+                stream = sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+                                        blocksize=BLOCK, callback=on_audio)
+                stream.start()
+                print(f"{time.strftime('%H:%M:%S')}  Microphone ON")
+            elif not reporter.enabled and stream is not None:
+                stream.close()
+                stream = None
+                pipeline.reset()
+                while not blocks.empty():
+                    blocks.get_nowait()
+                reporter.status = {"level": 0.0, "listening": False, "heard": None}
+                print(f"{time.strftime('%H:%M:%S')}  Microphone OFF")
+            if stream is None:
+                time.sleep(0.2)
+                continue
+            try:
+                pipeline.feed(blocks.get(timeout=0.5), time.monotonic())
+            except queue.Empty:
+                continue
+            reporter.status = {"level": round(pipeline.level, 5), "listening": True, "heard": pipeline.heard}
+    finally:
+        if stream is not None:
+            stream.close()
 
 
 def main() -> None:

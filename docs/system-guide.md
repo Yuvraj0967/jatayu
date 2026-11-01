@@ -70,7 +70,7 @@ The estimates are too scattered to report as rates. No hand count was recorded.
 
 ## Microphone
 
-`.\tools\start-audio.ps1` runs an offline listener on the laptop (`audio/`). It flags screams, shouts, distress sounds and
+`.\tools\start-audio.ps1` runs an offline listener on the laptop (`audio/`). The microphone stays closed until the button on `/csi` turns it on, and closes if the backend becomes unreachable. It flags screams, shouts, distress sounds and
 the words "help", "help me", "please help", "somebody help" and "save me", then shows a popup and stores an `AUDIO_ALERT`
 event. Audio is never saved or sent; only the result is. Sound classes come from YAMNet and words from Vosk.
 

@@ -788,3 +788,27 @@ def test_detector_boosts_faint_audio_and_ignores_silence():
     assert det.above_noise(room * 4) is True
     assert det.above_noise(np.zeros(16000)) is False
 
+
+def test_microphone_is_off_until_operator_turns_it_on():
+    svc = _service()
+    assert svc.audio_heartbeat(0.0)["enabled"] is False
+    assert svc.set_audio_enabled(True)["enabled"] is True
+    reply = svc.audio_heartbeat(0.02, listening=True, heard={"label": "Speech", "score": 0.6})
+    audio = svc.snapshot()["audio"]
+    assert reply["enabled"] is True and audio["listening"] is True and audio["heard"]["label"] == "Speech"
+    svc.set_audio_enabled(False)
+    assert svc.audio_heartbeat(0.0)["enabled"] is False
+    assert sum(e["event_type"] in {"MICROPHONE_ON", "MICROPHONE_OFF"} for e in svc.store.events(limit=20)) == 2
+
+
+def test_microphone_api_rejects_non_boolean():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "c.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        assert client.post("/api/audio/control", json={"enabled": "yes"}).status_code == 400
+        assert client.post("/api/audio/control", json={"enabled": True}).json() == {"enabled": True}
+        assert client.post("/api/audio/heartbeat", json={"level": 0.1, "listening": True}).json() == {"enabled": True}
+

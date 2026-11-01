@@ -170,10 +170,21 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
     async def audio_heartbeat(r: Request) -> JSONResponse:
         data = await body(r)
         try:
-            service.audio_heartbeat(max(0.0, min(1.0, float(data.get("level", 0.0)))))
+            heard = data.get("heard")
+            if isinstance(heard, dict):
+                heard = {"label": str(heard.get("label", ""))[:60], "score": max(0.0, min(1.0, float(heard.get("score", 0.0))))}
+            else:
+                heard = None
+            return JSONResponse(service.audio_heartbeat(max(0.0, min(1.0, float(data.get("level", 0.0)))),
+                                                        listening=data.get("listening") is True, heard=heard))
         except (TypeError, ValueError) as exc:
             return err(str(exc))
-        return JSONResponse({"ok": True})
+
+    async def audio_control(r: Request) -> JSONResponse:
+        enabled = (await body(r)).get("enabled")
+        if not isinstance(enabled, bool):
+            return err("enabled must be true or false")
+        return JSONResponse(service.set_audio_enabled(enabled))
 
     async def sim_key(r: Request) -> JSONResponse:
         sim = service.arduino
@@ -236,6 +247,7 @@ def build_routes(service: JatayuService, hub: LiveHub, extra_status: Any = None)
         Route("/api/inspection/request", inspection, methods=["POST"]),
         Route("/api/audio/event", audio_event, methods=["POST"]),
         Route("/api/audio/heartbeat", audio_heartbeat, methods=["POST"]),
+        Route("/api/audio/control", audio_control, methods=["POST"]),
         Route("/api/simulate/key", sim_key, methods=["POST"]),
         Route("/api/simulate/gas", sim_gas, methods=["POST"]),
         WebSocketRoute("/ws/live", live),

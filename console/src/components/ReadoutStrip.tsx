@@ -84,9 +84,9 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
     },
     {
       label: 'Microphone',
-      value: status?.audio?.online ? 'Listening' : 'Off',
+      value: status?.audio?.online && status.audio.listening ? 'Listening' : 'Off',
       sub: status?.audio?.last ? status.audio.last.text : 'Nothing flagged',
-      tone: status?.audio?.last ? 'var(--warning)' : status?.audio?.online ? 'var(--good)' : undefined,
+      tone: status?.audio?.last ? 'var(--warning)' : status?.audio?.online && status.audio.listening ? 'var(--good)' : undefined,
       stale,
     },
     {

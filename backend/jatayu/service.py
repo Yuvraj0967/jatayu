@@ -44,6 +44,9 @@ class JatayuService:
         self.has_lcd = True  # the UNO says otherwise in its hello
         self._audio_seen_at: float | None = None
         self._audio_level = 0.0
+        self._audio_enabled = False  # the microphone stays closed until an operator turns it on
+        self._audio_listening = False
+        self._audio_heard: dict[str, Any] | None = None
         self._audio_last: dict[str, Any] | None = None
         self._code_until = 0.0
         self._lives: list[int] = []
@@ -165,10 +168,23 @@ class JatayuService:
                                                  "payload": payload, "incident_id": None, "created_at": now}})
 
     # -- microphone listener --------------------------------------------------------
-    def audio_heartbeat(self, level: float, now: float | None = None) -> None:
+    def audio_heartbeat(self, level: float, now: float | None = None, listening: bool = False,
+                        heard: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Listener check-in. The reply tells it whether the microphone should be open."""
+
         with self.lock:
             self._audio_seen_at = time.time() if now is None else now
             self._audio_level = level
+            self._audio_listening = listening
+            self._audio_heard = heard
+            return {"enabled": self._audio_enabled}
+
+    def set_audio_enabled(self, enabled: bool, actor: str = "operator") -> dict[str, Any]:
+        with self.lock:
+            if enabled != self._audio_enabled:
+                self._audio_enabled = enabled
+                self._emit("MICROPHONE_ON" if enabled else "MICROPHONE_OFF", actor)
+            return {"enabled": self._audio_enabled}
 
     def report_audio(self, kind: str, text: str, score: float, now: float | None = None) -> dict[str, Any]:
         """A sound the listener flagged. Opens or joins an incident while monitoring is on."""
@@ -388,7 +404,8 @@ class JatayuService:
                 "last_key": self.last_key,
                 "lives": {"total": sum(self._lives), "last": self._lives_last},
                 "audio": {"online": bool(self._audio_seen_at and time.time() - self._audio_seen_at <= AUDIO_STALE_S),
-                          "level": self._audio_level, "last": self._audio_last},
+                          "enabled": self._audio_enabled, "listening": self._audio_listening,
+                          "level": self._audio_level, "heard": self._audio_heard, "last": self._audio_last},
                 "lcd_page": self.lcd_page,
                 "incident_counts": self.store.count_incidents(),
                 "performance": {"tick_ms": self.tick_ms},

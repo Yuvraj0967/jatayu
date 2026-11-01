@@ -294,6 +294,15 @@
     .btn.recording { color: var(--warn); }
     .card-title { color: var(--text); text-transform: none; letter-spacing: 0; font-size: 14px; }
     #livesPopup { background: var(--surface) !important; color: var(--text) !important; border-color: var(--brand) !important; }
+    .mic-card { width: 100%; display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); font-size: 12px; }
+    .mic-head { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+    .mic-btn { width: 100%; }
+    .mic-btn[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+    :root.dark .mic-btn[aria-pressed="true"] { color: #0c0a09; }
+    .mic-meter { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+    .mic-meter span { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+    .mic-state { color: var(--text-2); }
+    .mic-heard { color: var(--muted); min-height: 32px; line-height: 1.3; overflow-wrap: anywhere; }
     /* The 3D view stays a dark viewport so the figure stands out. */
     #sceneCard {
       --bg: #0d1210; --surface: #111614; --surface-2: #1a201d; --surface-3: #232b27;
@@ -375,6 +384,13 @@
         </div>
         <div class="hero-side">
           <canvas id="orb" aria-hidden="true"></canvas>
+          <div class="mic-card" aria-label="Microphone">
+            <div class="mic-head"><span class="dot" id="micPanelDot"></span><b>Microphone</b></div>
+            <button class="btn small mic-btn" id="micBtn" type="button" aria-pressed="false">Turn on</button>
+            <div class="mic-meter" aria-hidden="true"><span id="micMeter"></span></div>
+            <div class="mic-state" id="micState" aria-live="polite">Off</div>
+            <div class="mic-heard" id="micHeard">&nbsp;</div>
+          </div>
         </div>
       </section>
 
@@ -791,11 +807,24 @@
     $('gasRebase').addEventListener('click', () => { fetch('/api/sensors/rebaseline', { method: 'POST' }).then(() => toast('Measuring a new baseline after warm-up.')).catch(() => toast('Could not reach the backend.', true)); });
 
     // Sounds flagged by the microphone listener.
-    let audioSeen = null;
+    let audioSeen = null, micEnabled = false;
+    $('micBtn').addEventListener('click', () => {
+      fetch('/api/audio/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !micEnabled }) })
+        .catch(() => toast('Could not reach the backend.', true));
+    });
     function showAudio(audio) {
       if (!audio) return;
-      $('mMic').textContent = audio.online ? 'Listening' : 'Off';
-      $('micDot').className = `dot ${audio.last ? 'warn' : audio.online ? 'ok' : ''}`;
+      const listening = audio.online && audio.listening;
+      $('mMic').textContent = listening ? 'Listening' : 'Off';
+      $('micDot').className = `dot ${audio.last ? 'warn' : listening ? 'ok' : ''}`;
+      micEnabled = !!audio.enabled;
+      $('micBtn').textContent = micEnabled ? 'Turn off' : 'Turn on';
+      $('micBtn').setAttribute('aria-pressed', String(micEnabled));
+      $('micPanelDot').className = `dot ${listening ? 'ok' : !audio.online ? 'warn' : ''}`;
+      $('micState').textContent = !audio.online ? 'Listener not running on the laptop' : listening ? 'Listening' : micEnabled ? 'Starting…' : 'Off';
+      // Square root so quiet sounds still move the meter.
+      $('micMeter').style.width = listening ? `${Math.min(100, Math.sqrt(audio.level || 0) * 330)}%` : '0';
+      $('micHeard').textContent = listening && audio.heard ? `Hearing: ${audio.heard.label} ${Math.round(audio.heard.score * 100)}%` : (audio.last ? audio.last.text : '\u00a0');
       const last = audio.last, id = last ? last.id : 0;
       if (audioSeen === null) { audioSeen = id; return; }
       if (id === audioSeen || !last) return;
