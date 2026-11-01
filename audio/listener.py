@@ -195,6 +195,9 @@ def run_microphone(device: int | None, pipeline: Pipeline, reporter: Reporter) -
                 pipeline.feed(blocks.get(timeout=0.5), time.monotonic())
             except queue.Empty:
                 continue
+            except Exception as exc:  # one bad block must not stop the listener
+                print(f"{time.strftime('%H:%M:%S')}  Skipped a block: {exc}")
+                continue
             reporter.status = {"level": round(pipeline.level, 5), "listening": True, "heard": pipeline.heard}
     finally:
         if stream is not None:

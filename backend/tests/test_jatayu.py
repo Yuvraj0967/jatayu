@@ -812,3 +812,16 @@ def test_microphone_api_rejects_non_boolean():
         assert client.post("/api/audio/control", json={"enabled": True}).json() == {"enabled": True}
         assert client.post("/api/audio/heartbeat", json={"level": 0.1, "listening": True}).json() == {"enabled": True}
 
+
+def test_detector_matches_whole_help_words_only():
+    def heard(*words):
+        det = _audio_detector()
+        det.on_sound_scores({"Speech": 0.6}, 0.0)
+        return det.on_words([{"word": w, "conf": 0.9} for w in words], 0.5)
+
+    assert heard("helping", "out") is None  # used to crash the listener
+    assert heard("helpful") is None
+    assert heard("he", "help", "me").text.endswith('"help me"')
+    assert heard("please", "help").text.endswith('"please help"')
+    assert heard("help").text.endswith('"help"')
+

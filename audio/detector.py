@@ -121,9 +121,12 @@ class AudioDetector:
         if now - self._last_voice > self.voice_memory_s:
             return None
         confident = [w for w in words if w.get("word") != "[unk]" and float(w.get("conf", 0.0)) >= self.word_confidence]
-        phrase = " ".join(w["word"] for w in confident)
+        spoken = [w["word"] for w in confident]
         for candidate in HELP_PHRASES:
-            if candidate in phrase:
-                score = min(float(w["conf"]) for w in confident if w["word"] in candidate.split())
-                return self._emit("help", score, now, f'"{candidate}"')
+            target = candidate.split()
+            # Whole words in order, so "helping" or "helpful" is not a call for help.
+            for start in range(len(spoken) - len(target) + 1):
+                if spoken[start:start + len(target)] == target:
+                    score = min(float(w["conf"]) for w in confident[start:start + len(target)])
+                    return self._emit("help", score, now, f'"{candidate}"')
         return None
