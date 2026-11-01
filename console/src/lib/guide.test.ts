@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { summarisePayload } from './format'
 import { nextAction, type NextActionInput } from './guide'
 
 const base: NextActionInput = {
@@ -100,5 +101,13 @@ describe('nextAction', () => {
 
   it('keeps the backend rule first even when everything else is quiet', () => {
     expect(run({ apiReachable: false, monitoring: false }).key).toBe('backend')
+  })
+})
+
+describe('summarisePayload', () => {
+  it('turns structured observation details into text', () => {
+    const text = summarisePayload({ actor: 'keypad', notes: null })
+    expect(typeof text).toBe('string')
+    expect(text).toContain('keypad')
   })
 })

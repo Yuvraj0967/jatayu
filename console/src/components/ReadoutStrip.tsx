@@ -97,9 +97,9 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
     },
     {
       label: 'Active incidents',
-      value: counts ? `${counts.open}` : '—',
+      value: counts ? `${counts.open ?? 0}` : '—',
       sub: counts
-        ? `${counts.open} open · ${counts.acknowledged} acknowledged`
+        ? `${counts.open ?? 0} open · ${counts.acknowledged ?? 0} acknowledged`
         : 'No incident data',
       tone: counts?.open ? 'var(--warning)' : undefined,
       stale,

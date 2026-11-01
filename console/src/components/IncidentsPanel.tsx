@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Incident, IncidentDetail } from '../api/types'
-import { fmtTime, plural, sentence } from '../lib/format'
+import { fmtTime, plural, sentence, summarisePayload } from '../lib/format'
 import { INCIDENT_TONE } from '../lib/rf'
 import { IconPlus } from './Icons'
 import { Panel } from './Panel'
@@ -184,7 +184,7 @@ export function IncidentsPanel({
                           {sentence(observation.observation_type)} · {fmtTime(observation.created_at)}
                         </div>
                         <p className="mt-0.5 whitespace-pre-wrap break-words text-[0.75rem] leading-relaxed">
-                          {observation.detail}
+                          {summarisePayload(observation.detail, 220) || '—'}
                         </p>
                       </li>
                     ))}

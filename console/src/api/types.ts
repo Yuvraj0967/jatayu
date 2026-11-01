@@ -123,7 +123,7 @@ export interface Incident {
 export interface Observation {
   id: number
   observation_type: string
-  detail: string
+  detail: unknown // backend sends structured details; demo data sends text
   created_at: number
 }
 

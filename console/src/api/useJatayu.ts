@@ -214,7 +214,8 @@ export function useJatayuFeed(apiBase: string): JatayuFeed {
           return
         }
         if (payload.type === 'jatayu') {
-          setStatus(payload as unknown as Status)
+          // Live snapshots omit the link details that /api/status adds.
+          setStatus((previous) => ({ ...(previous ?? {}), ...(payload as unknown as Status) }))
           setLastStatusAt(Date.now())
         } else if (payload.type === 'event' && payload.event) {
           const event = payload.event as EventItem
