@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0e13">
+  <meta name="theme-color" content="#fdfbfd">
   <title>JATAYU Console</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0e13'/%3E%3Cpath d='M4 17h6l2.5-6 4 12 3-9 2 3H28' fill='none' stroke='%2334d399' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <script src="vendor/three.min.js"></script>
@@ -263,7 +263,51 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
+  
+    /* ---------- matches the operator console (console/src/index.css) ---------- */
+    :root {
+      --bg: #fdfbfd; --surface: #ffffff; --surface-2: #f4f7f5; --surface-3: #e9f0ef;
+      --line: #ece8ea; --line-strong: #d9d4d7;
+      --text: #0c0a09; --text-2: #4f4b4a; --muted: #6f6b6a;
+      --brand: #0b7a52; --ok: #0b7a52; --idle: #6f6b6a; --warn: #a15c00; --info: #2f6fb0; --bad: #b3261e; --alert: #b3261e;
+      --radius: 16px; --shadow: 0 1px 2px rgba(12, 10, 9, .05);
+      --font: 'Plus Jakarta Sans', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    :root.dark {
+      --bg: #111413; --surface: #191d1b; --surface-2: #202622; --surface-3: #2b332e;
+      --line: #2b332e; --line-strong: #3a443e;
+      --text: #f2f5f3; --text-2: #c2cbc5; --muted: #9ba69f;
+      --brand: #57e2ab; --ok: #57e2ab; --idle: #9ba69f; --warn: #f0b866; --info: #7fb5ec; --bad: #f08c86; --alert: #f08c86;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+    body { background-image: radial-gradient(900px 320px at 50% -140px, rgba(66, 213, 152, .12), transparent); background-repeat: no-repeat; }
+    .topbar { background: color-mix(in srgb, var(--bg) 88%, transparent); }
+    .card { border-radius: 16px; }
+    .metric, .device-line, .settings { border-radius: 12px; }
+    .btn { border-radius: 999px; }
+    .btn:hover:not(:disabled) { border-color: var(--line-strong); }
+    .btn.primary { color: #fff; } :root.dark .btn.primary { color: #0c0a09; }
+    .btn.primary:hover:not(:disabled) { background: var(--brand); border-color: var(--brand); filter: brightness(1.1); }
+    .btn.alert { color: var(--alert); border-color: var(--alert); }
+    .btn.alert:hover:not(:disabled) { background: var(--alert); color: #fff; }
+    .btn.done { color: var(--ok); border-color: var(--ok); }
+    .btn.recording { color: var(--warn); }
+    .card-title { color: var(--text); text-transform: none; letter-spacing: 0; font-size: 14px; }
+    #livesPopup { background: var(--surface) !important; color: var(--text) !important; border-color: var(--brand) !important; }
+    /* The 3D view stays a dark viewport so the figure stands out. */
+    #sceneCard {
+      --bg: #0d1210; --surface: #111614; --surface-2: #1a201d; --surface-3: #232b27;
+      --line: rgba(255, 255, 255, .1); --line-strong: rgba(255, 255, 255, .18);
+      --text: #f2f5f3; --text-2: #c2cbc5; --muted: #9ba69f; --ok: #57e2ab; --info: #7fb5ec;
+      background: var(--surface); color: var(--text); overflow: hidden;
+    }
+    .chip, .link-pill, .scene-status, .scene-key, .scene-readouts, .toast, .sim-badge, .cal-status { border-radius: 10px; }
+    .progress, .score .bar { border-radius: 999px; }
   </style>
+  <script>
+    // Follow the console's light or dark choice.
+    try { const saved = JSON.parse(localStorage.getItem('jatayu.console.settings') || '{}'); const dark = saved.theme === 'dark' || (saved.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.classList.toggle('dark', dark); } catch (e) {}
+  </script>
 </head>
 <body>
   <div class="alert-banner" role="alert"><span>●</span> <span id="alertBannerText">Operator alert active.</span></div>
@@ -276,7 +320,8 @@
       </div>
     </div>
     <div class="link-pill" id="linkPill" aria-live="polite"><span class="dot" id="linkDot"></span><span id="linkText">Connecting to backend…</span></div>
-    <button class="btn alert" id="alertBtn" type="button" disabled>
+    <a class="btn small" href="/">← Console</a>
+      <button class="btn alert" id="alertBtn" type="button" disabled>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
       <span id="alertLabel">Raise alert</span>
     </button>
@@ -1267,7 +1312,7 @@
     redrawStatic(); updateClock(); connect(); requestAnimationFrame(loop);
   })();
   </script>
-<a href="/" style="position:fixed;top:10px;right:14px;z-index:9999;padding:5px 11px;border-radius:8px;background:#2a78d6;color:#fff;font:13px system-ui,sans-serif;text-decoration:none">&larr; JATAYU console</a>
+
 <script>
 (function () {
   if (new URLSearchParams(location.search).get('embed') === '1') document.querySelectorAll('a[href="/"]').forEach(function (a) { a.remove(); });

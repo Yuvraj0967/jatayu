@@ -709,3 +709,11 @@ def test_candidate_rate_reaches_rf_features():
     rf = RfAssessor().assess(_csi("empty") | {"bpm": None, "bpm_instant": 18.5}, 100)
     assert rf["features"]["dominant_rate_per_min"] == 18.5
 
+
+def test_compare_recordings_verdict():
+    from compare_recordings import verdict
+
+    assert "Not enough" in verdict([1.0], [2.0, 3.0])
+    assert "do not overlap" in verdict([3.0, 4.0], [0.5, 0.7])
+    assert "overlap" in verdict([1.0, 3.0], [2.0, 4.0]) and "do not" in verdict([1.0, 3.0], [2.0, 4.0])
+

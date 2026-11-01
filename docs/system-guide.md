@@ -119,7 +119,7 @@ if the error is within 2 cycles/min and the empty recording does not show the sa
 ## Comparing an empty and a crowded room
 
 Keep the same hardware, spacing and settings in both rooms. Film real data (header shows `Live`, never press `7`) and
-record 3 minutes in each room with `capture_raw.py`. Compare `activity_median` and `activity_p90` from
+record each trial with `bash ~/JATAYU/tools/record_trial.sh <label>`, then run `compare_recordings.py`. Compare `activity_median` and `activity_p90` from
 `analyze_recording.py`. Do this on at least 3 pairs of recordings before claiming a difference, and report the rooms as
 tested, because one room's result does not generalise. Record a new baseline for each new room or layout.
 
