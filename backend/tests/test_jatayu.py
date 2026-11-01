@@ -872,3 +872,16 @@ def test_alert_carries_rough_proximity_from_loudness():
     with pytest.raises(ValueError):
         svc.report_audio("scream", "x", 0.5, proximity="here")
 
+
+def test_results_page_is_served_at_simple():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "c.json"), db_path=str(tmp / "j.db"))
+    with TestClient(backend_app.create_app(options)) as client:
+        page = client.get("/simple/")
+        assert page.status_code == 200 and "model.js" in page.text
+        assert client.get("/simple/app.js").status_code == 200
+        assert client.get("/simple/../../backend/app.py").status_code == 404
+

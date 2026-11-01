@@ -10,7 +10,8 @@
     ? new Date(seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     : '—';
 
-  let base = 'http://127.0.0.1:8000';
+  // Served by the backend itself: same origin. Opened from a file or another server: local backend.
+  let base = location.pathname.startsWith('/simple') && location.port !== '4173' ? location.origin : 'http://127.0.0.1:8000';
   try {
     const saved = new URLSearchParams(location.search).get('backend') || localStorage.getItem('jatayu-backend');
     if (saved) base = backendURL(saved);

@@ -19,7 +19,10 @@ It changes nothing. It reads these endpoints with `GET` and issues no writes:
 
 ## Open it
 
-Start the backend as usual, then open the page either way:
+Start the backend as usual, then open `http://<pi-ip>:8000/simple/`. The backend
+serves this folder and the page uses that same address.
+
+It also opens without the backend serving it, either way:
 
 ```bash
 # from the repository root

@@ -44,6 +44,7 @@ from jatayu.store import Store
 BACKEND_DIR = Path(__file__).resolve().parent
 DASHBOARD = BACKEND_DIR.parent / "dashboard" / "console.html"  # JATAYU operator console (served at /)
 CSI_PAGE = BACKEND_DIR.parent / "dashboard" / "index.html"  # CSI view and calibration (served at /csi)
+SIMPLE_PAGE = BACKEND_DIR.parent / "dashboard" / "simple"  # read-only results page (served at /simple/)
 VENDOR_FILES = {"three.min.js", "OrbitControls.js"}  # bundled so the 3D view works offline
 STATE_TEXT = {
     "breathing": "Periodic RF pattern observed",
@@ -491,6 +492,8 @@ def create_app(options: RuntimeOptions) -> Starlette:
         *build_routes(runtime.jatayu, runtime.hub, lambda: runtime.reader.status() if runtime.reader else {"kind": "simulation"}),
         WebSocketRoute("/ws", websocket_endpoint),
     ]
+    if SIMPLE_PAGE.is_dir():
+        routes.append(Mount("/simple", StaticFiles(directory=str(SIMPLE_PAGE), html=True)))
     if options.console_dist and (Path(options.console_dist) / "assets").is_dir():
         routes.append(Mount("/assets", StaticFiles(directory=str(Path(options.console_dist) / "assets"))))
     # CORS: the dashboard may also be opened straight from disk (file://).
