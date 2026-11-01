@@ -4,7 +4,6 @@ import { fmtNumber, fmtRatio, fmtScore } from '../lib/format'
 import {
   RF_SHORT,
   RF_TONE,
-  confidenceTone,
   dataQualityTone,
   rfSentence,
 } from '../lib/rf'
@@ -57,8 +56,6 @@ export function RFPanel({ rf, history, simple, stale, ageLabel }: RFPanelProps) 
             <>
               <span className="label ml-1">Quality</span>
               <StatusLabel tone={dataQualityTone(rf.data_quality)}>{rf.data_quality}</StatusLabel>
-              <span className="label ml-1">Confidence</span>
-              <StatusLabel tone={confidenceTone(rf.confidence)}>{String(rf.confidence)}</StatusLabel>
             </>
           ) : null}
         </div>

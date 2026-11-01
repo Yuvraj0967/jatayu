@@ -6,7 +6,7 @@ import { IconGear, IconMoon, IconPlay, IconStop, IconSun } from './Icons'
 
 interface TopBarProps {
   feedState: FeedIndicator
-  source: 'live' | 'simulated' | null
+  source: 'live' | 'simulated' | 'demo' | null
   updatedAt: number | null
   monitoring: boolean
   busy: boolean
@@ -118,7 +118,7 @@ export function TopBar({
                 style={{ background: source === 'simulated' ? 'var(--muted)' : 'var(--good)' }}
                 aria-hidden="true"
               />
-              {source === 'simulated' ? 'Simulated' : source === 'live' ? 'Live' : 'Connecting'}
+              {source === 'simulated' ? 'Simulated' : source === 'live' ? 'Live' : source === 'demo' ? 'Connected' : 'Connecting'}
             </span>
           )}
 

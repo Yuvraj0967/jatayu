@@ -6,6 +6,7 @@ import { EnvironmentPanel } from './components/EnvironmentPanel'
 import { EventTimeline } from './components/EventTimeline'
 import { HelpDialog } from './components/HelpDialog'
 import { IncidentsPanel } from './components/IncidentsPanel'
+import { KeypadEffects } from './components/KeypadEffects'
 import { LimitsBanner } from './components/LimitsBanner'
 import { NextAction } from './components/NextAction'
 import { NodesTable } from './components/NodesTable'
@@ -161,6 +162,7 @@ function OverviewApp() {
   }, [settings])
 
   const startTour = useCallback(() => setTourOpen(true), [])
+  const showOverview = useCallback(() => setTab('overview'), [])
 
   return (
     <div className="min-h-screen">
@@ -360,6 +362,7 @@ function OverviewApp() {
       />
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       <Tour open={tourOpen} onFinish={finishTour} onTab={setTab} />
+      <KeypadEffects status={status} apiBase={settings.apiBase} onShowOverview={showOverview} />
     </div>
   )
 }

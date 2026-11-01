@@ -68,6 +68,10 @@ def summarise(frames: list[CSIFrame], results: list[dict], breaths: float | None
         for name in ("rhythm", "focus", "strength"):
             summary[f"{name}_median"] = round(float(np.median([r["scores"][name] for r in valid])), 2)
         summary["confidence_median"] = round(float(np.median([r["confidence"] for r in valid])), 2)
+        # Faster signal changes (0.8-4 Hz) relative to noise: compares a still room with a busy one.
+        activity = [r["motion_index"] for r in valid]
+        summary["activity_median"] = round(float(np.median(activity)), 2)
+        summary["activity_p90"] = round(float(np.percentile(activity, 90)), 2)
     if rates.size:
         summary["estimated_rate_median"] = round(float(np.median(rates)), 1)
         summary["estimated_rate_range"] = [round(float(np.percentile(rates, q)), 1) for q in (10, 90)]

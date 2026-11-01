@@ -12,7 +12,7 @@ export const startHere: string[] = [
 ]
 
 export const pageMap: GlossaryEntry[] = [
-  { term: 'Readout strip', text: 'Six live values: monitoring, ESP32 node, Arduino Mega, RF state, environment and active incidents.' },
+  { term: 'Readout strip', text: 'Six live values: monitoring, ESP32 node, Arduino, RF state, environment and active incidents.' },
   { term: 'RF observation', text: 'What the Wi-Fi signal looks like right now, with the chart of the periodicity score over time.' },
   { term: 'Environmental sensor', text: 'Raw ADC counts from the uncalibrated gas sensor, with baseline and elevated-above references.' },
   { term: 'Incidents', text: 'The open cases a human is expected to review, with evidence and acknowledgement controls.' },

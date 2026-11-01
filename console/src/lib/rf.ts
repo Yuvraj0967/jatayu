@@ -25,7 +25,7 @@ export const RF_SHORT: Record<string, string> = {
   COLLECTING: 'Collecting',
   INSUFFICIENT_DATA: 'Insufficient data',
   LOW_QUALITY: 'Low quality',
-  NO_CLEAR_PERIODIC_PATTERN: 'No clear pattern',
+  NO_CLEAR_PERIODIC_PATTERN: 'Reading signal',
   PERIODIC_PATTERN_OBSERVED: 'Periodic pattern',
   REVIEW_RECOMMENDED: 'Review recommended',
 }
@@ -35,7 +35,7 @@ export const RF_SENTENCE: Record<string, string> = {
   COLLECTING: 'Collecting packets. A pattern judgement needs more data.',
   INSUFFICIENT_DATA: 'There is not enough clean data to judge the signal.',
   LOW_QUALITY: 'The signal is too weak or inconsistent to judge.',
-  NO_CLEAR_PERIODIC_PATTERN: 'No clear periodic RF pattern is present in the recent window.',
+  NO_CLEAR_PERIODIC_PATTERN: 'Readings update every second from the CSI stream.',
   PERIODIC_PATTERN_OBSERVED: 'A periodic RF pattern is being observed. Further investigation is recommended.',
   REVIEW_RECOMMENDED: 'A regular RF pattern held long enough to warrant a human review.',
 }

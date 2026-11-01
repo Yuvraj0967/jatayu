@@ -27,8 +27,7 @@ export function EventTimeline({ events, incidents, selectedId, onSelectIncident 
   }, [events, onlySelected, selectedId])
 
   return (
-    <Panel
-      title="Event timeline"
+    <Paneltitle="Event timeline"
       tour="timeline"
       id="timeline"
       help="Every state change is appended to an audit trail: monitoring, observations, commands and operator actions. Newest first. Filtering by incident shows only the events tied to the record you selected."

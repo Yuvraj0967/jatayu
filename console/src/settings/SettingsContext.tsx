@@ -17,7 +17,8 @@ interface StoredSettings {
 const STORAGE_KEY = 'jatayu.console.settings'
 
 const DEFAULTS: StoredSettings = {
-  apiBase: 'http://localhost:8000',
+  // Served by the backend: same origin. Vite dev server: the local backend.
+  apiBase: window.location.port === '5173' ? 'http://localhost:8000' : window.location.origin,
   theme: 'light',
   themeVersion: 1,
   textSize: 2,

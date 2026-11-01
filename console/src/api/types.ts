@@ -75,12 +75,13 @@ export interface LastKey {
 
 export interface Status {
   type: 'jatayu'
-  source: 'simulated' | 'live'
+  source: 'simulated' | 'live' | 'demo'
   monitoring: boolean
   devices: { esp32: 'online' | 'offline'; arduino: 'online' | 'offline' }
   rf: RfState
   environment: EnvironmentState
   last_key: LastKey | null
+  lives?: { total: number; last: { id: number; count: number; text: string; at: number } | null }
   lcd_page: string
   incident_counts: { open: number; acknowledged: number; closed: number }
   performance: { tick_ms: number }

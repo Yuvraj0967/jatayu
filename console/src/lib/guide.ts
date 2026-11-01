@@ -6,7 +6,7 @@ export interface NextActionInput {
   mode: 'connecting' | 'live' | 'demo'
   /** Age in seconds of the last status update. */
   lastUpdateAgeS: number
-  source: 'live' | 'simulated' | null
+  source: 'live' | 'simulated' | 'demo' | null
   monitoring: boolean
   esp32Online: boolean
   arduinoOnline: boolean

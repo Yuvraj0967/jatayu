@@ -17,7 +17,7 @@ Update it whenever the setup or a result changes. Last updated 2026-10-31.
 
 | Address | Data source | Started by |
 | --- | --- | --- |
-| `http://192.168.137.10:8000` | Operator console. **Real** data, or **simulated** after pressing `7` | `jatayu.service` |
+| `http://192.168.137.10:8000` | React operator console (source in `console/`, build with `npm run build`, copy `console/dist` to the Pi). **Real** data, or **simulated** after pressing `7` | `jatayu.service` |
 | `http://192.168.137.10:8000/csi` | Original signal view and calibration. Same data and same key | `jatayu.service` |
 
 ## Simulation
@@ -74,9 +74,9 @@ Keys open the matching section and highlight it for 3 seconds:
 
 | Key | Console (`/`) | Signal view (`/csi`) |
 | --- | --- | --- |
-| `3` sensor | Environmental sensor | Gas sensor |
+| `3` sensor | Gas panel | Gas sensor |
 | `5` RF | RF observation | Reading and scores |
-| `6` system | Status tiles | Device messages |
+| `6` system | Readout tiles | Device messages |
 | `7` incidents | Incidents | Event log |
 | `9` diagnostics | Event timeline | Subcarrier activity |
 
@@ -115,6 +115,13 @@ sudo systemctl start jatayu
 
 Compare against an `--label empty` recording of the same length, without `--breaths`. A result counts only
 if the error is within 2 cycles/min and the empty recording does not show the same rhythm.
+
+## Comparing an empty and a crowded room
+
+Keep the same hardware, spacing and settings in both rooms. Film real data (header shows `Live`, never press `7`) and
+record 3 minutes in each room with `capture_raw.py`. Compare `activity_median` and `activity_p90` from
+`analyze_recording.py`. Do this on at least 3 pairs of recordings before claiming a difference, and report the rooms as
+tested, because one room's result does not generalise. Record a new baseline for each new room or layout.
 
 ## Measuring properly
 

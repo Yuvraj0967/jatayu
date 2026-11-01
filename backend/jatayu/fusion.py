@@ -109,7 +109,7 @@ class RfAssessor:
             "periodicity_score": round(float(telemetry.get("periodicity") or 0.0), 3),
             "features": {
                 "rhythm": scores.get("rhythm"), "focus": scores.get("focus"), "strength": scores.get("strength"),
-                "dominant_rate_per_min": telemetry.get("bpm"), "motion_index": telemetry.get("motion_index"),
+                "dominant_rate_per_min": telemetry.get("bpm") or telemetry.get("bpm_instant"), "motion_index": telemetry.get("motion_index"),
                 "packet_rate_hz": (telemetry.get("link") or {}).get("packet_rate_hz"),
                 "packet_loss_ratio": self.loss_ratio(telemetry),
                 "rssi": (telemetry.get("link") or {}).get("rssi"),

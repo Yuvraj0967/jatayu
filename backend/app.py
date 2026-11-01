@@ -29,7 +29,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
-from starlette.routing import Route, WebSocketRoute
+from starlette.routing import Mount, Route, WebSocketRoute
+from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from processing import CSIProcessor, ProcessorConfig
@@ -67,6 +68,7 @@ class RuntimeOptions:
     arduino_port: str = "auto"  # "auto", a device path, or "none" to disable
     arduino_baud: int = 115200
     db_path: str = str(BACKEND_DIR / "jatayu.db")
+    console_dist: str | None = None  # built React console; None serves dashboard/console.html
 
 
 @dataclass
@@ -399,9 +401,11 @@ def create_app(options: RuntimeOptions) -> Starlette:
         return JSONResponse({"detail": message}, status_code=status)
 
     async def dashboard(_request: Request) -> Response:
-        if not DASHBOARD.exists():
-            return error(f"Dashboard not found at {DASHBOARD}", 404)
-        return FileResponse(DASHBOARD, headers={"Cache-Control": "no-store"})
+        built = Path(options.console_dist) / "index.html" if options.console_dist else None
+        page = built if built and built.exists() else DASHBOARD
+        if not page.exists():
+            return error(f"Dashboard not found at {page}", 404)
+        return FileResponse(page, headers={"Cache-Control": "no-store"})
 
     async def demo_toggle(_request: Request) -> JSONResponse:
         return JSONResponse({"active": await runtime.toggle_demo()})
@@ -487,6 +491,8 @@ def create_app(options: RuntimeOptions) -> Starlette:
         *build_routes(runtime.jatayu, runtime.hub, lambda: runtime.reader.status() if runtime.reader else {"kind": "simulation"}),
         WebSocketRoute("/ws", websocket_endpoint),
     ]
+    if options.console_dist and (Path(options.console_dist) / "assets").is_dir():
+        routes.append(Mount("/assets", StaticFiles(directory=str(Path(options.console_dist) / "assets"))))
     # CORS: the dashboard may also be opened straight from disk (file://).
     middleware = [Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])]
     app = Starlette(routes=routes, middleware=middleware, lifespan=lifespan)
@@ -585,6 +591,7 @@ def main() -> None:
         model_path=args.model,
         arduino_port=args.arduino_port,
         arduino_baud=args.arduino_baud,
+        console_dist=str(BACKEND_DIR.parent / "console" / "dist"),
         db_path=str(BACKEND_DIR / "jatayu.simulated.db") if args.simulate and args.db == str(BACKEND_DIR / "jatayu.db") else args.db,
     )
     url = f"http://{'127.0.0.1' if args.host in {'0.0.0.0', '::'} else args.host}:{args.port}"

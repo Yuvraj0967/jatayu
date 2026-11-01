@@ -688,3 +688,24 @@ def test_keypad_sections_exist_on_each_page(page, sections):
     for section in sections:
         assert f'id="{section}"' in html and f"'{section}'" in html
 
+
+def test_built_console_is_served_when_present():
+    from starlette.testclient import TestClient
+    import app as backend_app
+
+    tmp = Path(tempfile.mkdtemp())
+    (tmp / "dist" / "assets").mkdir(parents=True)
+    (tmp / "dist" / "index.html").write_text("<title>react console</title>")
+    (tmp / "dist" / "assets" / "app.js").write_text("console.log(1)")
+    options = backend_app.RuntimeOptions(simulate=True, calibration_file=str(tmp / "c.json"), db_path=str(tmp / "j.db"),
+                                         console_dist=str(tmp / "dist"))
+    with TestClient(backend_app.create_app(options)) as client:
+        assert "react console" in client.get("/").text
+        assert client.get("/assets/app.js").status_code == 200
+        assert client.get("/csi").status_code == 200
+
+
+def test_candidate_rate_reaches_rf_features():
+    rf = RfAssessor().assess(_csi("empty") | {"bpm": None, "bpm_instant": 18.5}, 100)
+    assert rf["features"]["dominant_rate_per_min"] == 18.5
+

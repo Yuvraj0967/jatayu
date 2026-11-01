@@ -54,7 +54,7 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
       stale,
     },
     {
-      label: 'Arduino Mega',
+      label: 'Arduino',
       value: online(devices?.arduino),
       sub: status?.arduino_link?.port
         ? `${status.arduino_link.port}${status.arduino_link.error ? ' · link error' : ''}`
@@ -65,7 +65,9 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
     {
       label: 'RF state',
       value: rf ? RF_SHORT[rf.state] ?? rf.state : '—',
-      sub: rf ? `quality ${rf.data_quality} · confidence ${rf.confidence}` : 'No status yet',
+      sub: rf
+        ? `${rf.features?.dominant_rate_per_min != null ? `${fmtNumber(rf.features.dominant_rate_per_min, 1)} per min · ` : ''}quality ${rf.data_quality}`
+        : 'No status yet',
       stale,
     },
     {
@@ -78,6 +80,19 @@ function buildCells(status: Status | null, mode: Mode, ageS: number | null): Cel
             ? 'No reading yet'
             : 'No status yet',
       tone: env?.status === 'ELEVATED' ? 'var(--serious)' : undefined,
+      stale,
+    },
+    {
+      label: 'Keypad',
+      value: status?.last_key?.key ?? '—',
+      sub: status?.last_key ? status.last_key.action.replace(/_/g, ' ').toLowerCase() : 'No key pressed yet',
+      stale,
+    },
+    {
+      label: 'Lives saved',
+      value: String(status?.lives?.total ?? 0),
+      sub: 'Reported from the keypad',
+      tone: status?.lives?.total ? 'var(--good)' : undefined,
       stale,
     },
     {
@@ -98,7 +113,7 @@ export function ReadoutStrip({ status, mode, lastStatusAt, now }: ReadoutStripPr
   const stale = Boolean(status) && ageS != null && ageS > 6
 
   return (
-    <div data-tour="readout" className="min-w-0">
+    <div id="readout-strip" data-tour="readout" className="min-w-0">
       {stale ? (
         <p
           className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.71875rem] font-semibold"
@@ -110,7 +125,7 @@ export function ReadoutStrip({ status, mode, lastStatusAt, now }: ReadoutStripPr
           Stale values · last update {ageS != null && Number.isFinite(ageS) ? Math.round(ageS) : '?'} s ago
         </p>
       ) : null}
-      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         {cells.map((cell) => (
           <div key={cell.label} className={cn('stat', cell.stale && 'opacity-75')}>
             <div className="label flex items-center gap-1.5 truncate">
